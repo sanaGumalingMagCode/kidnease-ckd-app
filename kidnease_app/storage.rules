@@ -1,0 +1,38 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the folder
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function to check file size (max 2MB)
+    function isValidSize() {
+      return request.resource.size < 2 * 1024 * 1024;
+    }
+    
+    // Helper function to check if file is an image
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Food images - users can only upload to their own folder
+    match /users/{userId}/food_images/{imageId} {
+      // Allow upload only for authenticated users to their own folder
+      // with size limit of 2MB and image content type
+      allow write: if isOwner(userId) && isValidSize() && isImage();
+      
+      // Allow read only for the owner
+      allow read: if isOwner(userId);
+      
+      // Allow delete for cleanup (privacy-first approach)
+      allow delete: if isOwner(userId);
+    }
+  }
+}
