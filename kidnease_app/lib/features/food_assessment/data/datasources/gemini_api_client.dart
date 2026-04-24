@@ -13,7 +13,8 @@ import '../models/nutritional_data.dart';
 abstract class GeminiApiClient {
   /// Analyze food image and return nutritional assessment
   Future<GeminiResponse> analyzeFood({
-    required String imageUrl,
+    String? imageUrl,
+    File? imageFile,
     required DietaryProfile userProfile,
     NutritionalData? fatSecretData,
   });
@@ -32,12 +33,18 @@ class GeminiApiClientImpl implements GeminiApiClient {
 
   @override
   Future<GeminiResponse> analyzeFood({
-    required String imageUrl,
+    String? imageUrl,
+    File? imageFile,
     required DietaryProfile userProfile,
     NutritionalData? fatSecretData,
   }) async {
     if (_apiKey.isEmpty) {
       throw const ApiException('Gemini API key not configured');
+    }
+
+    // Must provide either imageUrl or imageFile
+    if (imageUrl == null && imageFile == null) {
+      throw const ValidationException('Either imageUrl or imageFile must be provided');
     }
 
     int retryCount = 0;
@@ -46,15 +53,24 @@ class GeminiApiClientImpl implements GeminiApiClient {
     while (retryCount <= maxRetries) {
       try {
         logger.info('Analyzing food with Gemini API', context: {
-          'imageUrl': imageUrl.substring(0, 50),
+          'hasImageUrl': imageUrl != null,
+          'hasImageFile': imageFile != null,
           'attempt': retryCount + 1,
         });
 
         // Build the prompt
         final prompt = _buildPrompt(userProfile, fatSecretData);
 
-        // Download image and convert to base64
-        final imageBytes = await _downloadImage(imageUrl);
+        // Get image bytes
+        final List<int> imageBytes;
+        if (imageFile != null) {
+          // Read from local file
+          imageBytes = await imageFile.readAsBytes();
+        } else {
+          // Download from URL
+          imageBytes = await _downloadImage(imageUrl!);
+        }
+        
         final base64Image = base64Encode(imageBytes);
 
         // Build request body

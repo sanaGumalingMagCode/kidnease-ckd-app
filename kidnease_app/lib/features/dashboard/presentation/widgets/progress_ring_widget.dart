@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../dietary_profile/domain/entities/dietary_profile.dart';
 import '../../../../shared/providers/providers.dart';
+import '../../../../core/utils/logger.dart';
 
 class ProgressRingWidget extends ConsumerWidget {
   final String userId;
@@ -24,6 +25,18 @@ class ProgressRingWidget extends ConsumerWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Handle errors gracefully
+        if (snapshot.hasError) {
+          logger.warning('Error loading daily totals: ${snapshot.error}');
+          // Show default values when there's an error
+          return _buildProgressRings({
+            'sodium': 0.0,
+            'potassium': 0.0,
+            'phosphorus': 0.0,
+            'protein': 0.0,
+          });
+        }
+
         final totals = snapshot.data ?? {
           'sodium': 0.0,
           'potassium': 0.0,
@@ -31,64 +44,63 @@ class ProgressRingWidget extends ConsumerWidget {
           'protein': 0.0,
         };
 
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildProgressRing(
-                      context,
-                      'Sodium',
-                      totals['sodium']!,
-                      profile.dailySodiumLimit,
-                      'mg',
-                      Colors.red,
-                    ),
-                    _buildProgressRing(
-                      context,
-                      'Potassium',
-                      totals['potassium']!,
-                      profile.dailyPotassiumLimit,
-                      'mg',
-                      Colors.orange,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildProgressRing(
-                      context,
-                      'Phosphorus',
-                      totals['phosphorus']!,
-                      profile.dailyPhosphorusLimit,
-                      'mg',
-                      Colors.blue,
-                    ),
-                    _buildProgressRing(
-                      context,
-                      'Protein',
-                      totals['protein']!,
-                      profile.dailyProteinLimit,
-                      'g',
-                      Colors.green,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
+        return _buildProgressRings(totals);
       },
     );
   }
 
+  Widget _buildProgressRings(Map<String, double> totals) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildProgressRing(
+                  'Sodium',
+                  totals['sodium']!,
+                  profile.dailySodiumLimit,
+                  'mg',
+                  Colors.red,
+                ),
+                _buildProgressRing(
+                  'Potassium',
+                  totals['potassium']!,
+                  profile.dailyPotassiumLimit,
+                  'mg',
+                  Colors.orange,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildProgressRing(
+                  'Phosphorus',
+                  totals['phosphorus']!,
+                  profile.dailyPhosphorusLimit,
+                  'mg',
+                  Colors.blue,
+                ),
+                _buildProgressRing(
+                  'Protein',
+                  totals['protein']!,
+                  profile.dailyProteinLimit,
+                  'g',
+                  Colors.green,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildProgressRing(
-    BuildContext context,
     String label,
     double current,
     double limit,
@@ -143,7 +155,7 @@ class ProgressRingWidget extends ConsumerWidget {
                     ),
                   ),
                   if (isOverLimit)
-                    Icon(
+                    const Icon(
                       Icons.warning_amber,
                       size: 16,
                       color: Colors.red,
@@ -156,16 +168,18 @@ class ProgressRingWidget extends ConsumerWidget {
         const SizedBox(height: 8),
         Text(
           label,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           '${current.toInt()} / ${limit.toInt()} $unit',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
-              ),
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
         ),
       ],
     );

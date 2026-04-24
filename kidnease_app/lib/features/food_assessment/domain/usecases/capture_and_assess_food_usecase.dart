@@ -7,6 +7,7 @@ import 'package:kidnease_app/features/food_assessment/data/datasources/gemini_ap
 import 'package:kidnease_app/features/food_assessment/data/datasources/image_capture_service.dart';
 import 'package:kidnease_app/features/food_assessment/data/datasources/local_cache_repository.dart';
 import 'package:kidnease_app/features/food_assessment/data/repositories/firestore_repository.dart';
+import 'package:kidnease_app/features/food_assessment/data/models/gemini_response.dart';
 import 'package:kidnease_app/features/food_assessment/domain/entities/dietary_assessment.dart';
 import 'package:kidnease_app/features/food_assessment/domain/entities/extracted_nutrients.dart';
 import 'package:kidnease_app/features/food_assessment/domain/entities/risk_notification.dart';
@@ -112,10 +113,10 @@ class CaptureAndAssessFoodUseCase {
         );
       }
 
-      // Step 4: Upload to Cloud Storage
-      logger.info('Uploading image to Cloud Storage...');
-      imageUrl = await cloudStorageRepository.uploadImage(compressedImage, userId);
-      logger.info('Image uploaded successfully: $imageUrl');
+      // Step 4: Skip Cloud Storage - use local file directly
+      logger.info('Using local file for Gemini analysis (no cloud upload needed)...');
+      imageUrl = compressedImage.path; // Keep local path for database reference
+      logger.info('Using local image path: $imageUrl');
 
       // Step 5: Query FatSecret API (optional, graceful degradation)
       logger.info('Querying FatSecret API...');
@@ -129,12 +130,11 @@ class CaptureAndAssessFoodUseCase {
         logger.warning('FatSecret API failed, continuing with Gemini-only analysis: $e');
       }
 
-      // Step 6: Analyze with Gemini AI
-      logger.info('Analyzing food with Gemini AI...');
+      // Step 6: Analyze with Gemini AI using local file
+      logger.info('Analyzing image with Gemini AI...');
       final geminiResponse = await geminiApiClient.analyzeFood(
-        imageUrl: imageUrl,
+        imageFile: compressedImage,
         userProfile: userProfile,
-        fatSecretData: null,
       );
       logger.info('Gemini analysis complete: ${geminiResponse.detectedFoodName}');
 
@@ -165,8 +165,8 @@ class CaptureAndAssessFoodUseCase {
         timestamp: DateTime.now(),
         imageUrl: imageUrl,
         detectedFoodName: geminiResponse.detectedFoodName,
-        riskLevel: riskAssessment.riskLevel,
-        explanationText: riskAssessment.explanation,
+        riskLevel: geminiResponse.riskLevelEnum,
+        explanationText: geminiResponse.explanationText,
         filipinoAlternatives: geminiResponse.filipinoAlternatives,
       );
 
@@ -186,11 +186,11 @@ class CaptureAndAssessFoodUseCase {
         notificationId: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: userId,
         assessmentId: assessmentId,
-        severityLevel: riskAssessment.riskLevel.displayText,
+        severityLevel: geminiResponse.riskLevel,
         displayMessage: _generateDisplayMessage(
-          riskLevel: riskAssessment.riskLevel.displayText,
+          riskLevel: geminiResponse.riskLevel,
           foodName: geminiResponse.detectedFoodName,
-          explanation: riskAssessment.explanation,
+          explanation: geminiResponse.explanationText,
         ),
         timestamp: DateTime.now(),
         dismissed: false,
@@ -198,16 +198,26 @@ class CaptureAndAssessFoodUseCase {
 
       // Step 11: Save to Firestore (transaction for assessment + nutrients)
       logger.info('Saving assessment to Firestore...');
-      await firestoreRepository.createAssessment(
-        assessment: assessment,
-        nutrients: updatedNutrients,
-      );
-      logger.info('Assessment saved to Firestore');
+      try {
+        await firestoreRepository.createAssessment(
+          assessment: assessment,
+          nutrients: updatedNutrients,
+        );
+        logger.info('Assessment saved to Firestore');
+      } catch (e) {
+        logger.warning('Firestore save failed: $e');
+        // Continue anyway - data is still shown to user
+      }
 
       // Step 12: Save notification to Firestore
       logger.info('Saving notification to Firestore...');
-      await firestoreRepository.createNotification(notification);
-      logger.info('Notification saved to Firestore');
+      try {
+        await firestoreRepository.createNotification(notification);
+        logger.info('Notification saved to Firestore');
+      } catch (e) {
+        logger.warning('Notification save failed: $e');
+        // Continue anyway - notification is still shown to user
+      }
 
       // Step 13: Cache locally for offline access
       logger.info('Caching assessment locally...');
@@ -225,8 +235,8 @@ class CaptureAndAssessFoodUseCase {
         assessment: assessment,
         nutrients: updatedNutrients,
         notification: notification,
-        riskLevel: riskAssessment.riskLevel.displayText,
-        explanation: riskAssessment.explanation,
+        riskLevel: geminiResponse.riskLevel,
+        explanation: geminiResponse.explanationText,
         filipinoAlternatives: geminiResponse.filipinoAlternatives,
       );
     } catch (e) {
@@ -252,18 +262,8 @@ class CaptureAndAssessFoodUseCase {
         throw Exception('Unexpected error during assessment: $e');
       }
     } finally {
-      // Step 15: Delete image from storage (always execute, even on error)
-      if (imageUrl != null) {
-        try {
-          logger.info('Deleting image from Cloud Storage...');
-          await cloudStorageRepository.deleteImage(imageUrl);
-          logger.info('Image deleted successfully');
-        } catch (e) {
-          // Non-critical error, log and continue
-          // The lifecycle policy will delete it after 24 hours anyway
-          logger.warning('Failed to delete image immediately: $e. Lifecycle policy will clean up after 24 hours.');
-        }
-      }
+      // Step 15: Skip cloud storage deletion (using local files)
+      logger.info('Using local file, no cloud storage cleanup needed');
     }
   }
 

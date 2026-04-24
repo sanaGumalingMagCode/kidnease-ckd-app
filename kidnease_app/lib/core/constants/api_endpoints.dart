@@ -3,8 +3,8 @@
 class ApiEndpoints {
   // Gemini API
   static const String geminiBaseUrl =
-      'https://generativelanguage.googleapis.com/v1';
-  static const String geminiModel = 'gemini-3.0-pro';
+      'https://generativelanguage.googleapis.com/v1beta';
+  static const String geminiModel = 'gemini-1.5-flash';
   static String get geminiGenerateContent =>
       '$geminiBaseUrl/models/$geminiModel:generateContent';
 
