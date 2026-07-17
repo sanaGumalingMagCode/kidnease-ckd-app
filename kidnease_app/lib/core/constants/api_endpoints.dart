@@ -1,10 +1,12 @@
 /// API Endpoints for external services
 
 class ApiEndpoints {
-  // Gemini API (Free Tier - using v1beta with gemini-1.5-flash)
+  // Gemini API (Free Tier - using v1beta with gemini-2.0-flash-exp)
+  // If this doesn't work, user needs to get a new API key from:
+  // https://aistudio.google.com/app/apikey
   static const String geminiBaseUrl =
       'https://generativelanguage.googleapis.com/v1beta';
-  static const String geminiModel = 'gemini-1.5-flash';
+  static const String geminiModel = 'gemini-2.0-flash-exp';
   static String get geminiGenerateContent =>
       '$geminiBaseUrl/models/$geminiModel:generateContent';
 
