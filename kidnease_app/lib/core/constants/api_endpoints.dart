@@ -4,7 +4,7 @@ class ApiEndpoints {
   // Gemini API (Free Tier - using v1beta with gemini-1.5-flash)
   static const String geminiBaseUrl =
       'https://generativelanguage.googleapis.com/v1beta';
-  static const String geminiModel = 'gemini-1.5-flash-latest';
+  static const String geminiModel = 'gemini-1.5-flash';
   static String get geminiGenerateContent =>
       '$geminiBaseUrl/models/$geminiModel:generateContent';
 
