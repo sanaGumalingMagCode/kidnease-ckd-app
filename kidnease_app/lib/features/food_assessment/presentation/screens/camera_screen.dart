@@ -470,6 +470,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         foodName: result.assessment.detectedFoodName,
         explanation: result.explanation,
         filipinoAlternatives: result.filipinoAlternatives,
+        sodium: result.nutrients.sodiumValue,
+        potassium: result.nutrients.potassiumValue,
+        phosphorus: result.nutrients.phosphorusValue,
+        protein: result.nutrients.proteinValue,
         onDismiss: () => Navigator.of(context).pop(),
       ),
     );

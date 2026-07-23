@@ -7,6 +7,11 @@ class RiskNotificationWidget extends StatefulWidget {
   final String explanation;
   final List<String> filipinoAlternatives;
   final VoidCallback onDismiss;
+  // Macros
+  final double sodium;
+  final double potassium;
+  final double phosphorus;
+  final double protein;
 
   const RiskNotificationWidget({
     Key? key,
@@ -15,6 +20,10 @@ class RiskNotificationWidget extends StatefulWidget {
     required this.explanation,
     required this.filipinoAlternatives,
     required this.onDismiss,
+    this.sodium = 0,
+    this.potassium = 0,
+    this.phosphorus = 0,
+    this.protein = 0,
   }) : super(key: key);
 
   @override
@@ -182,6 +191,57 @@ class _RiskNotificationWidgetState extends State<RiskNotificationWidget>
                         ),
                       ),
 
+                      // Estimated Macros
+                      const SizedBox(height: 20),
+                      Text(
+                        'Estimated Nutritional Content',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildMacroRow(
+                              icon: Icons.water_drop,
+                              color: Colors.blue,
+                              label: 'Sodium',
+                              value: '${widget.sodium.toStringAsFixed(0)} mg',
+                            ),
+                            const Divider(height: 16),
+                            _buildMacroRow(
+                              icon: Icons.local_fire_department,
+                              color: Colors.orange,
+                              label: 'Potassium',
+                              value: '${widget.potassium.toStringAsFixed(0)} mg',
+                            ),
+                            const Divider(height: 16),
+                            _buildMacroRow(
+                              icon: Icons.diamond,
+                              color: Colors.purple,
+                              label: 'Phosphorus',
+                              value: '${widget.phosphorus.toStringAsFixed(0)} mg',
+                            ),
+                            const Divider(height: 16),
+                            _buildMacroRow(
+                              icon: Icons.fitness_center,
+                              color: Colors.green,
+                              label: 'Protein',
+                              value: '${widget.protein.toStringAsFixed(1)} g',
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // Filipino Alternatives (only for high risk)
                       if (isHighRisk && widget.filipinoAlternatives.isNotEmpty) ...[
                         const SizedBox(height: 20),
@@ -298,6 +358,45 @@ class _RiskNotificationWidgetState extends State<RiskNotificationWidget>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMacroRow({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2C3E50),
+          ),
+        ),
+      ],
     );
   }
 }
