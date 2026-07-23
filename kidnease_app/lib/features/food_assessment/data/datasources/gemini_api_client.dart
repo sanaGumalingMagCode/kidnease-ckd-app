@@ -167,6 +167,7 @@ class GeminiApiClientImpl implements GeminiApiClient {
   String _buildPrompt(DietaryProfile userProfile, NutritionalData? fatSecretData) {
     final buffer = StringBuffer();
     buffer.writeln('You are a renal nutrition assistant analyzing food for a CKD (Chronic Kidney Disease) patient.');
+    buffer.writeln('IMPORTANT: If the food is a Filipino dish (like Kare-Kare, Adobo, Sinigang, Tinola, Paksiw, Nilaga, Bistek, Caldereta, Menudo, Dinuguan, Kinilaw, Lechon, etc.), use its FILIPINO NAME in detectedFoodName, not an English translation.');
     buffer.writeln();
     buffer.writeln("Patient's Daily Dietary Limits:");
     buffer.writeln('- Sodium: ${userProfile.dailySodiumLimit.toStringAsFixed(0)} mg');
