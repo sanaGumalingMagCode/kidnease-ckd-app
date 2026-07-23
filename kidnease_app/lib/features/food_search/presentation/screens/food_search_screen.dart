@@ -52,7 +52,9 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
         if (result != null) {
           _searchResult = result;
         } else {
-          _errorMessage = 'No food found with that name. Try these:\n• Banana\n• White Rice\n• Chicken\n• Milk\n• Egg\n• Bread';
+          _errorMessage = 'No food found with that name. Try these:\n\n'
+              'Common Foods:\n• Banana  • White Rice  • Chicken\n• Milk  • Egg  • Bread\n\n'
+              'Filipino Dishes:\n• Adobo  • Sinigang  • Kare Kare\n• Leche Flan  • Tinola  • Lumpia';
         }
       });
     } catch (e) {
@@ -66,6 +68,7 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
   // Fallback database for common foods (CKD-relevant nutritional data)
   NutritionalData? _searchFallbackDatabase(String query) {
     final foods = {
+      // Common foods
       'banana': NutritionalData(
         productName: 'Banana (medium, 118g)',
         servingSize: '1 medium banana (118g)',
@@ -178,10 +181,20 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
         phosphorus: 230.0,
         protein: 26.0,
       ),
+      
+      // Filipino Dishes
       'adobo': NutritionalData(
         productName: 'Chicken Adobo (Filipino)',
         servingSize: '1 cup (240g)',
         sodium: 800.0, // High sodium from soy sauce
+        potassium: 350.0,
+        phosphorus: 200.0,
+        protein: 25.0,
+      ),
+      'chicken adobo': NutritionalData(
+        productName: 'Chicken Adobo (Filipino)',
+        servingSize: '1 cup (240g)',
+        sodium: 800.0,
         potassium: 350.0,
         phosphorus: 200.0,
         protein: 25.0,
@@ -193,6 +206,206 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
         potassium: 450.0,
         phosphorus: 150.0,
         protein: 18.0,
+      ),
+      'kare kare': NutritionalData(
+        productName: 'Kare-Kare (Filipino Peanut Stew)',
+        servingSize: '1 cup (250g)',
+        sodium: 520.0,
+        potassium: 480.0, // High from peanuts and vegetables
+        phosphorus: 200.0, // High from peanuts
+        protein: 20.0,
+      ),
+      'kare-kare': NutritionalData(
+        productName: 'Kare-Kare (Filipino Peanut Stew)',
+        servingSize: '1 cup (250g)',
+        sodium: 520.0,
+        potassium: 480.0,
+        phosphorus: 200.0,
+        protein: 20.0,
+      ),
+      'leche flan': NutritionalData(
+        productName: 'Leche Flan (Filipino Custard)',
+        servingSize: '1 slice (80g)',
+        sodium: 85.0,
+        potassium: 150.0,
+        phosphorus: 140.0, // High from eggs and milk
+        protein: 6.5,
+      ),
+      'lechon': NutritionalData(
+        productName: 'Lechon (Roasted Pig)',
+        servingSize: '100g',
+        sodium: 750.0, // High sodium
+        potassium: 320.0,
+        phosphorus: 280.0, // High from meat
+        protein: 28.0,
+      ),
+      'lumpia': NutritionalData(
+        productName: 'Lumpia (Filipino Spring Roll)',
+        servingSize: '2 pieces (100g)',
+        sodium: 450.0,
+        potassium: 180.0,
+        phosphorus: 120.0,
+        protein: 8.0,
+      ),
+      'pancit': NutritionalData(
+        productName: 'Pancit (Filipino Noodles)',
+        servingSize: '1 cup (200g)',
+        sodium: 680.0, // High from soy sauce
+        potassium: 220.0,
+        phosphorus: 140.0,
+        protein: 12.0,
+      ),
+      'tinola': NutritionalData(
+        productName: 'Tinola (Chicken Ginger Soup)',
+        servingSize: '1 bowl (300g)',
+        sodium: 580.0,
+        potassium: 380.0,
+        phosphorus: 180.0,
+        protein: 22.0,
+      ),
+      'sisig': NutritionalData(
+        productName: 'Sisig (Filipino Sizzling Pork)',
+        servingSize: '1 cup (200g)',
+        sodium: 920.0, // Very high sodium
+        potassium: 350.0,
+        phosphorus: 240.0,
+        protein: 24.0,
+      ),
+      'halo halo': NutritionalData(
+        productName: 'Halo-Halo (Filipino Dessert)',
+        servingSize: '1 serving (300g)',
+        sodium: 120.0,
+        potassium: 380.0, // High from fruits and beans
+        phosphorus: 160.0,
+        protein: 6.0,
+      ),
+      'halo-halo': NutritionalData(
+        productName: 'Halo-Halo (Filipino Dessert)',
+        servingSize: '1 serving (300g)',
+        sodium: 120.0,
+        potassium: 380.0,
+        phosphorus: 160.0,
+        protein: 6.0,
+      ),
+      'bistek': NutritionalData(
+        productName: 'Bistek Tagalog (Filipino Beef Steak)',
+        servingSize: '1 serving (200g)',
+        sodium: 720.0, // High from soy sauce
+        potassium: 420.0,
+        phosphorus: 260.0,
+        protein: 26.0,
+      ),
+      'menudo': NutritionalData(
+        productName: 'Menudo (Filipino Pork Stew)',
+        servingSize: '1 cup (240g)',
+        sodium: 650.0,
+        potassium: 450.0, // High from tomatoes and potatoes
+        phosphorus: 220.0,
+        protein: 22.0,
+      ),
+      'caldereta': NutritionalData(
+        productName: 'Caldereta (Filipino Beef Stew)',
+        servingSize: '1 cup (240g)',
+        sodium: 780.0,
+        potassium: 520.0, // High from tomatoes and potatoes
+        phosphorus: 240.0,
+        protein: 24.0,
+      ),
+      'paksiw': NutritionalData(
+        productName: 'Paksiw na Isda (Fish in Vinegar)',
+        servingSize: '1 serving (150g)',
+        sodium: 480.0,
+        potassium: 410.0,
+        phosphorus: 270.0, // High from fish
+        protein: 23.0,
+      ),
+      'nilaga': NutritionalData(
+        productName: 'Nilaga (Filipino Beef Soup)',
+        servingSize: '1 bowl (300g)',
+        sodium: 620.0,
+        potassium: 480.0, // High from vegetables
+        phosphorus: 200.0,
+        protein: 20.0,
+      ),
+      'dinuguan': NutritionalData(
+        productName: 'Dinuguan (Pork Blood Stew)',
+        servingSize: '1 cup (240g)',
+        sodium: 850.0, // High sodium
+        potassium: 320.0,
+        phosphorus: 280.0, // Very high from blood and pork
+        protein: 18.0,
+      ),
+      'arroz caldo': NutritionalData(
+        productName: 'Arroz Caldo (Filipino Rice Porridge)',
+        servingSize: '1 bowl (300g)',
+        sodium: 720.0,
+        potassium: 280.0,
+        phosphorus: 160.0,
+        protein: 16.0,
+      ),
+      'bulalo': NutritionalData(
+        productName: 'Bulalo (Beef Marrow Soup)',
+        servingSize: '1 bowl (350g)',
+        sodium: 680.0,
+        potassium: 500.0,
+        phosphorus: 320.0, // Very high from bone marrow
+        protein: 22.0,
+      ),
+      'tocino': NutritionalData(
+        productName: 'Tocino (Sweet Cured Pork)',
+        servingSize: '100g',
+        sodium: 920.0, // Very high sodium from curing
+        potassium: 320.0,
+        phosphorus: 240.0,
+        protein: 26.0,
+      ),
+      'longganisa': NutritionalData(
+        productName: 'Longganisa (Filipino Sausage)',
+        servingSize: '2 links (100g)',
+        sodium: 880.0, // Very high sodium
+        potassium: 280.0,
+        phosphorus: 220.0,
+        protein: 24.0,
+      ),
+      'turon': NutritionalData(
+        productName: 'Turon (Banana Spring Roll)',
+        servingSize: '1 piece (80g)',
+        sodium: 120.0,
+        potassium: 280.0, // High from banana
+        phosphorus: 45.0,
+        protein: 2.5,
+      ),
+      'bibingka': NutritionalData(
+        productName: 'Bibingka (Rice Cake)',
+        servingSize: '1 piece (100g)',
+        sodium: 180.0,
+        potassium: 140.0,
+        phosphorus: 160.0, // High from eggs and coconut milk
+        protein: 5.5,
+      ),
+      'puto': NutritionalData(
+        productName: 'Puto (Steamed Rice Cake)',
+        servingSize: '2 pieces (60g)',
+        sodium: 95.0,
+        potassium: 80.0,
+        phosphorus: 85.0,
+        protein: 3.2,
+      ),
+      'cassava cake': NutritionalData(
+        productName: 'Cassava Cake',
+        servingSize: '1 slice (100g)',
+        sodium: 110.0,
+        potassium: 220.0,
+        phosphorus: 125.0,
+        protein: 4.0,
+      ),
+      'ube halaya': NutritionalData(
+        productName: 'Ube Halaya (Purple Yam Jam)',
+        servingSize: '100g',
+        sodium: 65.0,
+        potassium: 380.0, // High from ube
+        phosphorus: 95.0,
+        protein: 2.8,
       ),
     };
 
@@ -253,7 +466,7 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Search for packaged foods and branded products to see their nutritional information',
+                        'Search for Filipino dishes, common foods, and packaged products to see their nutritional information',
                         style: TextStyle(
                           color: Colors.grey[700],
                           fontSize: 14,
@@ -281,7 +494,7 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search for food (e.g., "banana", "rice")',
+                    hintText: 'Try: "kare kare", "leche flan", "banana"',
                     hintStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: const Icon(
                       Icons.search,

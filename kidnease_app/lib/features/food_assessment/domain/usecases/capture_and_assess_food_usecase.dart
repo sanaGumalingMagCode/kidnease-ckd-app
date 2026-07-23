@@ -179,6 +179,7 @@ class CaptureAndAssessFoodUseCase {
       logger.info('Risk assessment complete: ${riskAssessment.riskLevel.displayText}');
 
       // Step 9: Create DietaryAssessment entity
+      // Use risk assessment engine's result (which considers cumulative intake) instead of Gemini's meal-only assessment
       final assessmentId = DateTime.now().millisecondsSinceEpoch.toString();
       final assessment = DietaryAssessment(
         assessmentId: assessmentId,
@@ -186,8 +187,8 @@ class CaptureAndAssessFoodUseCase {
         timestamp: DateTime.now(),
         imageUrl: imageUrl,
         detectedFoodName: geminiResponse.detectedFoodName,
-        riskLevel: geminiResponse.riskLevelEnum,
-        explanationText: geminiResponse.explanationText,
+        riskLevel: riskAssessment.riskLevel, // Use cumulative risk assessment, not Gemini's meal-only assessment
+        explanationText: riskAssessment.explanation, // Use cumulative explanation
         filipinoAlternatives: geminiResponse.filipinoAlternatives,
       );
 
@@ -203,15 +204,16 @@ class CaptureAndAssessFoodUseCase {
       );
 
       // Step 10: Create RiskNotification entity
+      // Use risk assessment engine's result for notification (considers cumulative intake)
       final notification = RiskNotification(
         notificationId: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: userId,
         assessmentId: assessmentId,
-        severityLevel: geminiResponse.riskLevel,
+        severityLevel: riskAssessment.riskLevel.displayText,
         displayMessage: _generateDisplayMessage(
-          riskLevel: geminiResponse.riskLevel,
+          riskLevel: riskAssessment.riskLevel.displayText,
           foodName: geminiResponse.detectedFoodName,
-          explanation: geminiResponse.explanationText,
+          explanation: riskAssessment.explanation,
         ),
         timestamp: DateTime.now(),
         dismissed: false,
@@ -251,13 +253,14 @@ class CaptureAndAssessFoodUseCase {
       }
 
       // Step 14: Return result
+      // Use risk assessment engine's cumulative assessment in result
       logger.info('Food assessment completed successfully');
       return AssessmentResult(
         assessment: assessment,
         nutrients: updatedNutrients,
         notification: notification,
-        riskLevel: geminiResponse.riskLevel,
-        explanation: geminiResponse.explanationText,
+        riskLevel: riskAssessment.riskLevel.displayText,
+        explanation: riskAssessment.explanation,
         filipinoAlternatives: geminiResponse.filipinoAlternatives,
       );
     } catch (e) {

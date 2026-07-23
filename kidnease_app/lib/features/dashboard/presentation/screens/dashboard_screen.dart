@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../shared/providers/providers.dart';
 import '../../../dietary_profile/presentation/screens/dietary_profile_screen.dart';
 import '../../../food_assessment/presentation/screens/camera_screen.dart';
 import '../../../food_search/presentation/screens/food_search_screen.dart';
+import '../../../onboarding/presentation/screens/onboarding_screen.dart';
+import '../../../help/presentation/screens/learn_more_screen.dart';
 import '../widgets/nutrient_chart_widget.dart';
 import '../widgets/progress_ring_widget.dart';
 import '../widgets/assessment_list_widget.dart';
@@ -29,6 +32,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         _selectedTabIndex = _tabController.index;
       });
     });
+    
+    // Check if onboarding should be shown
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+    
+    if (!onboardingComplete && mounted) {
+      // Show onboarding after a short delay
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -416,6 +438,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ModernActionCard(
+                        icon: Icons.search_rounded,
+                        title: 'Search Food',
+                        subtitle: 'Find nutrients',
+                        color: const Color(0xFFF39C12),
+                        onTap: () => _navigateToFoodSearch(context),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _ModernActionCard(
+                        icon: Icons.school_rounded,
+                        title: 'Learn More',
+                        subtitle: 'About CKD',
+                        color: const Color(0xFF9B59B6),
+                        onTap: () => _navigateToLearnMore(context),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ],
           ),
@@ -656,6 +702,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const FoodSearchScreen(),
+      ),
+    );
+  }
+
+  void _navigateToLearnMore(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const LearnMoreScreen(),
       ),
     );
   }
