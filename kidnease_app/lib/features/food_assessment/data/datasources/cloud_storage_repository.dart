@@ -82,15 +82,22 @@ class FirebaseCloudStorageRepository implements CloudStorageRepository {
         lastException = e;
         logger.error('Firebase Storage error uploading profile photo', error: e, context: {
           'code': e.code,
+          'message': e.message,
+          'plugin': e.plugin,
           'attempt': retryCount + 1,
         });
 
+        // More detailed error messages
         if (e.code == 'quota-exceeded') {
-          throw StorageException.quotaExceeded();
+          throw const StorageException('Storage quota exceeded. Please upgrade your Firebase plan.');
         } else if (e.code == 'unauthorized' || e.code == 'unauthenticated') {
-          throw StorageException.permissionDenied();
+          throw StorageException('Permission denied. Firebase Storage rules may not be deployed correctly. Error: ${e.message}');
         } else if (e.code == 'canceled') {
-          throw const StorageException('Upload canceled');
+          throw const StorageException('Upload canceled by user');
+        } else if (e.code == 'object-not-found') {
+          throw const StorageException('Storage bucket not found. Check Firebase configuration.');
+        } else if (e.code == 'bucket-not-found') {
+          throw const StorageException('Storage bucket does not exist. Check Firebase project settings.');
         }
 
         if (e.code == 'unknown' || e.code == 'unavailable') {
@@ -101,7 +108,8 @@ class FirebaseCloudStorageRepository implements CloudStorageRepository {
           }
         }
 
-        throw StorageException.uploadFailed();
+        // Include actual Firebase error code and message
+        throw StorageException('Upload failed (${e.code}): ${e.message ?? "Unknown error"}');
       } catch (e, stackTrace) {
         lastException = e as Exception?;
         logger.error('Unexpected profile photo upload error', error: e, stackTrace: stackTrace);

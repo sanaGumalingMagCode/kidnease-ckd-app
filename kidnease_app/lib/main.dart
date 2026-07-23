@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -21,6 +22,15 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     logger.info('Firebase initialized successfully');
+    
+    // Log Firebase Storage bucket info for diagnostics
+    try {
+      final storage = FirebaseStorage.instance;
+      final bucket = storage.bucket;
+      logger.info('Firebase Storage bucket: $bucket');
+    } catch (e) {
+      logger.warning('Could not get Firebase Storage info: $e');
+    }
 
     // Load environment variables (optional - app works without API keys in demo mode)
     logger.info('Loading environment variables...');
