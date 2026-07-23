@@ -84,14 +84,14 @@ class Validators {
     return null;
   }
 
-  /// Validate CKD stage (1-5)
+  /// Validate CKD stage (0-5, where 0 = Prevention/Healthy, 1-5 = CKD Stages)
   static String? validateCkdStage(int? value) {
     if (value == null) {
       return 'CKD stage is required';
     }
 
-    if (value < 1 || value > 5) {
-      return 'CKD stage must be between 1 and 5';
+    if (value < 0 || value > 5) {
+      return 'CKD stage must be between 0 and 5';
     }
 
     return null;

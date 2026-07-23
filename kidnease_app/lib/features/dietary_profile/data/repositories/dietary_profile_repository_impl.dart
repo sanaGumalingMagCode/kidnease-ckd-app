@@ -116,10 +116,10 @@ class DietaryProfileRepositoryImpl implements DietaryProfileRepository {
           'dailyProteinLimit', 'must be greater than zero');
     }
 
-    // Validate CKD stage
-    if (profile.ckdStage < 1 || profile.ckdStage > 5) {
+    // Validate CKD stage (0 = Prevention/Healthy, 1-5 = CKD Stages)
+    if (profile.ckdStage < 0 || profile.ckdStage > 5) {
       throw ValidationException.invalidValue(
-          'ckdStage', 'must be between 1 and 5');
+          'ckdStage', 'must be between 0 and 5');
     }
 
     // Validate KDIGO range
