@@ -38,15 +38,21 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
     });
 
     try {
+      // Try FatSecret API first
       final fatSecretClient = ref.read(fatSecretApiClientProvider);
-      final result = await fatSecretClient.searchProduct(query);
+      var result = await fatSecretClient.searchProduct(query);
+
+      // If FatSecret returns null, use fallback database
+      if (result == null) {
+        result = _searchFallbackDatabase(query);
+      }
 
       setState(() {
         _isSearching = false;
         if (result != null) {
           _searchResult = result;
         } else {
-          _errorMessage = 'No food found with that name. Try a different search term.';
+          _errorMessage = 'No food found with that name. Try these:\n• Banana\n• White Rice\n• Chicken\n• Milk\n• Egg\n• Bread';
         }
       });
     } catch (e) {
@@ -55,6 +61,154 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
         _errorMessage = 'Error searching food: ${e.toString()}';
       });
     }
+  }
+
+  // Fallback database for common foods (CKD-relevant nutritional data)
+  NutritionalData? _searchFallbackDatabase(String query) {
+    final foods = {
+      'banana': NutritionalData(
+        productName: 'Banana (medium, 118g)',
+        servingSize: '1 medium banana (118g)',
+        sodium: 1.2,
+        potassium: 422.0,
+        phosphorus: 26.0,
+        protein: 1.3,
+      ),
+      'white rice': NutritionalData(
+        productName: 'White Rice (cooked)',
+        servingSize: '1 cup (158g)',
+        sodium: 2.0,
+        potassium: 55.0,
+        phosphorus: 43.0,
+        protein: 4.3,
+      ),
+      'rice': NutritionalData(
+        productName: 'White Rice (cooked)',
+        servingSize: '1 cup (158g)',
+        sodium: 2.0,
+        potassium: 55.0,
+        phosphorus: 43.0,
+        protein: 4.3,
+      ),
+      'chicken': NutritionalData(
+        productName: 'Chicken Breast (cooked)',
+        servingSize: '100g',
+        sodium: 74.0,
+        potassium: 256.0,
+        phosphorus: 228.0,
+        protein: 31.0,
+      ),
+      'chicken breast': NutritionalData(
+        productName: 'Chicken Breast (cooked)',
+        servingSize: '100g',
+        sodium: 74.0,
+        potassium: 256.0,
+        phosphorus: 228.0,
+        protein: 31.0,
+      ),
+      'milk': NutritionalData(
+        productName: 'Whole Milk',
+        servingSize: '1 cup (244g)',
+        sodium: 105.0,
+        potassium: 322.0,
+        phosphorus: 205.0,
+        protein: 7.9,
+      ),
+      'egg': NutritionalData(
+        productName: 'Egg (large)',
+        servingSize: '1 large egg (50g)',
+        sodium: 71.0,
+        potassium: 69.0,
+        phosphorus: 99.0,
+        protein: 6.3,
+      ),
+      'bread': NutritionalData(
+        productName: 'White Bread',
+        servingSize: '1 slice (25g)',
+        sodium: 147.0,
+        potassium: 26.0,
+        phosphorus: 24.0,
+        protein: 2.3,
+      ),
+      'apple': NutritionalData(
+        productName: 'Apple (medium)',
+        servingSize: '1 medium apple (182g)',
+        sodium: 1.8,
+        potassium: 195.0,
+        phosphorus: 20.0,
+        protein: 0.5,
+      ),
+      'orange': NutritionalData(
+        productName: 'Orange (medium)',
+        servingSize: '1 medium orange (131g)',
+        sodium: 0.0,
+        potassium: 237.0,
+        phosphorus: 18.0,
+        protein: 1.2,
+      ),
+      'potato': NutritionalData(
+        productName: 'Potato (boiled)',
+        servingSize: '1 medium (173g)',
+        sodium: 10.0,
+        potassium: 544.0,
+        phosphorus: 84.0,
+        protein: 3.1,
+      ),
+      'fish': NutritionalData(
+        productName: 'White Fish (cooked)',
+        servingSize: '100g',
+        sodium: 54.0,
+        potassium: 390.0,
+        phosphorus: 250.0,
+        protein: 22.0,
+      ),
+      'pork': NutritionalData(
+        productName: 'Pork (lean, cooked)',
+        servingSize: '100g',
+        sodium: 62.0,
+        potassium: 423.0,
+        phosphorus: 246.0,
+        protein: 27.0,
+      ),
+      'beef': NutritionalData(
+        productName: 'Beef (lean, cooked)',
+        servingSize: '100g',
+        sodium: 72.0,
+        potassium: 370.0,
+        phosphorus: 230.0,
+        protein: 26.0,
+      ),
+      'adobo': NutritionalData(
+        productName: 'Chicken Adobo (Filipino)',
+        servingSize: '1 cup (240g)',
+        sodium: 800.0, // High sodium from soy sauce
+        potassium: 350.0,
+        phosphorus: 200.0,
+        protein: 25.0,
+      ),
+      'sinigang': NutritionalData(
+        productName: 'Sinigang (Filipino Soup)',
+        servingSize: '1 bowl (300g)',
+        sodium: 650.0,
+        potassium: 450.0,
+        phosphorus: 150.0,
+        protein: 18.0,
+      ),
+    };
+
+    final lowerQuery = query.toLowerCase();
+
+    // Exact match first
+    if (foods.containsKey(lowerQuery)) return foods[lowerQuery];
+
+    // Partial match - find first food whose key contains the query or vice versa
+    for (final entry in foods.entries) {
+      if (entry.key.contains(lowerQuery) || lowerQuery.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    return null;
   }
 
   @override
