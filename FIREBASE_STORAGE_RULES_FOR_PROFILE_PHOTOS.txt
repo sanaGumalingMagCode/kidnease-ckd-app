@@ -1,0 +1,75 @@
+FIREBASE STORAGE SECURITY RULES - COPY THESE TO FIREBASE CONSOLE
+================================================================
+
+IMPORTANT: You need to update your Firebase Storage Rules to allow profile photo uploads!
+
+WHERE TO APPLY THESE RULES:
+1. Go to: https://console.firebase.google.com/
+2. Select your project: kidnease
+3. Click "Storage" in the left sidebar
+4. Click the "Rules" tab at the top
+5. Replace the existing rules with the rules below
+6. Click "Publish"
+
+-----------------------------------------------
+COPY THESE RULES (Replace everything):
+-----------------------------------------------
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Profile photos - users can only write to their own profile folder
+    match /users/{userId}/profile/{filename} {
+      // Allow authenticated users to write to their own profile folder
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // Anyone can read profile photos (they're not sensitive)
+      allow read: if true;
+    }
+    
+    // Food images - users can only write to their own food_images folder
+    match /users/{userId}/food_images/{filename} {
+      // Allow authenticated users to write to their own folder
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // Users can read their own food images
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Deny everything else by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+-----------------------------------------------
+END OF RULES
+-----------------------------------------------
+
+EXPLANATION:
+- Users can only upload photos to their own folder (users/{their_user_id}/profile/)
+- This prevents users from uploading to other people's folders
+- Anyone can view profile photos (they're not sensitive data)
+- Food images are private (only the user can see them)
+
+AFTER APPLYING RULES:
+1. Test the app again
+2. Try uploading a profile photo
+3. Check the error message if it still fails
+4. The app will now show detailed error messages
+
+TROUBLESHOOTING:
+If upload still fails after applying rules:
+1. Check Firebase Console > Storage > Files to see if photo uploaded
+2. Look at the error message shown in the app
+3. Make sure you're logged in (authentication required)
+4. Check Firebase Console > Storage > Usage to ensure you haven't exceeded quota
+
+CURRENT STORAGE STRUCTURE:
+users/
+  └── {userId}/
+      ├── profile/
+      │   └── profile_photo.jpg  (your profile photo)
+      └── food_images/
+          └── {timestamp}.jpg  (scanned food photos)

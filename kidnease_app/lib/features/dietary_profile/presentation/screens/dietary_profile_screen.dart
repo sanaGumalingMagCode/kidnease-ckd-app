@@ -294,9 +294,9 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                               value: 0,
                               child: Row(
                                 children: [
-                                  Icon(Icons.favorite, color: Color(0xFF27AE60), size: 20),
-                                  SizedBox(width: 8),
-                                  Text('Prevention / Healthy'),
+                                  
+                                  
+                                  Text('Healthy'),
                                 ],
                               ),
                             ),
@@ -590,14 +590,37 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
       // Upload profile photo if a new one was selected
       if (_profileImage != null) {
         try {
+          logger.info('Uploading profile photo for user: ${widget.userId}');
           final storageRepo = ref.read(cloudStorageRepositoryProvider);
           photoUrl = await storageRepo.uploadProfilePhoto(
             userId: widget.userId,
             imageFile: _profileImage!,
           );
+          logger.info('Profile photo uploaded successfully: $photoUrl');
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile photo uploaded successfully!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 1),
+              ),
+            );
+          }
         } catch (e) {
-          // Non-critical error, continue without photo
-          logger.warning('Failed to upload profile photo: $e');
+          logger.error('Failed to upload profile photo: $e');
+          // Show error to user but continue saving profile
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Photo upload failed: ${e.toString()}. Profile will be saved without photo.'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+          // Don't update photoUrl if upload failed
+          photoUrl = widget.existingProfile?.profilePhotoUrl;
         }
       }
 
