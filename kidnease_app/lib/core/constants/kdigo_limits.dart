@@ -18,7 +18,14 @@ class KdigoLimits {
 }
 
 /// KDIGO-recommended daily limits by CKD stage
+/// Stage 0: Prevention/Healthy (for people without CKD who want to maintain kidney health)
 const Map<int, KdigoLimits> kdogoLimitsByCkdStage = {
+  0: KdigoLimits(
+    sodium: 2300, // Normal healthy adult limit (FDA recommendation)
+    potassium: 4700, // Adequate Intake for healthy adults
+    phosphorus: 1250, // RDA for healthy adults
+    protein: 80, // RDA for healthy adults (0.8-1.0g per kg body weight for 70kg)
+  ),
   1: KdigoLimits(
     sodium: 2300,
     potassium: 3500,

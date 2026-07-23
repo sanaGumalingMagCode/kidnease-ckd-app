@@ -29,7 +29,7 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
   final _phosphorusController = TextEditingController();
   final _proteinController = TextEditingController();
 
-  int _selectedCkdStage = 3; // Default to stage 3
+  int _selectedCkdStage = 0; // Default to Prevention/Healthy stage
   bool _isLoading = false;
   bool _showWarnings = false;
   File? _profileImage;
@@ -271,7 +271,7 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Select your Chronic Kidney Disease stage as diagnosed by your healthcare provider.',
+                          'Select your stage. Choose "Prevention" if you don\'t have CKD but want to maintain kidney health.',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.grey[600],
                               ),
@@ -286,12 +286,24 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          items: [1, 2, 3, 4, 5].map((stage) {
-                            return DropdownMenuItem(
-                              value: stage,
-                              child: Text('Stage $stage'),
-                            );
-                          }).toList(),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 0,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.favorite, color: Color(0xFF27AE60), size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Prevention / Healthy'),
+                                ],
+                              ),
+                            ),
+                            ...[ 1, 2, 3, 4, 5].map((stage) {
+                              return DropdownMenuItem(
+                                value: stage,
+                                child: Text('Stage $stage'),
+                              );
+                            }).toList(),
+                          ],
                           onChanged: _isLoading
                               ? null
                               : (value) {
