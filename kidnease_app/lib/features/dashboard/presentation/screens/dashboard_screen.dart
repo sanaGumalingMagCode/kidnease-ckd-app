@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/providers/providers.dart';
 import '../../../dietary_profile/presentation/screens/dietary_profile_screen.dart';
 import '../../../food_assessment/presentation/screens/camera_screen.dart';
+import '../../../food_search/presentation/screens/food_search_screen.dart';
 import '../widgets/nutrient_chart_widget.dart';
 import '../widgets/progress_ring_widget.dart';
 import '../widgets/assessment_list_widget.dart';
@@ -620,6 +621,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               },
             ),
             ListTile(
+              leading: const Icon(Icons.search, color: Color(0xFF4A90E2)),
+              title: const Text('Search Food Database'),
+              subtitle: const Text('Find nutritional info for any food'),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToFoodSearch(context);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('About'),
               onTap: () {
@@ -638,6 +648,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _navigateToFoodSearch(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const FoodSearchScreen(),
       ),
     );
   }
