@@ -12,59 +12,7 @@ COPY THESE FIRESTORE SECURITY RULES
 START COPYING FROM BELOW THIS LINE ↓
 ========================================
 
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Helper function to check if user is accessing their own data
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    // Users collection - allow users to create and read their own profile
-    match /users/{userId} {
-      // Allow user to create their own document during registration
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      
-      // Allow user to read and update their own profile
-      allow read, update: if isOwner(userId);
-      
-      // Prevent deletion of user profiles
-      allow delete: if false;
-    }
-    
-    // Dietary profiles collection
-    match /dietaryProfiles/{profileId} {
-      allow create: if isAuthenticated();
-      allow read, update, delete: if isAuthenticated() && 
-                            resource.data.userId == request.auth.uid;
-    }
-    
-    // Dietary assessments collection
-    match /dietaryAssessments/{assessmentId} {
-      allow create: if isAuthenticated();
-      allow read, update, delete: if isAuthenticated() && 
-                            resource.data.userId == request.auth.uid;
-    }
-    
-    // Extracted nutrients collection
-    match /extractedNutrients/{nutrientId} {
-      allow read, write: if isAuthenticated();
-    }
-    
-    // Risk notifications collection
-    match /riskNotifications/{notificationId} {
-      allow create: if isAuthenticated();
-      allow read, update, delete: if isAuthenticated() && 
-                            resource.data.userId == request.auth.uid;
-    }
-  }
-}
+
 
 ========================================
 STOP COPYING ABOVE THIS LINE ↑

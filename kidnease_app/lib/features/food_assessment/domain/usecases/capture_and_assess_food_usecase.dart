@@ -150,9 +150,30 @@ class CaptureAndAssessFoodUseCase {
       );
 
       // Step 8: Assess risk using Risk Assessment Engine
-      logger.info('Assessing dietary risk...');
+      // Factor in TODAY's cumulative intake from previous assessments
+      logger.info('Fetching today\'s nutrient totals...');
+      Map<String, double> todayTotals = {'sodium': 0, 'potassium': 0, 'phosphorus': 0, 'protein': 0};
+      try {
+        todayTotals = await firestoreRepository.getDailyNutrientTotals(userId, DateTime.now());
+        logger.info('Today\'s totals fetched', context: todayTotals.map((k, v) => MapEntry(k, v.toString())));
+      } catch (e) {
+        logger.warning('Could not fetch today\'s totals, using meal-only assessment: $e');
+      }
+
+      // Create cumulative nutrients (today's total + this meal)
+      final cumulativeNutrients = ExtractedNutrients(
+        nutrientRecordId: nutrients.nutrientRecordId,
+        assessmentId: '',
+        sodiumValue: nutrients.sodiumValue + (todayTotals['sodium'] ?? 0),
+        potassiumValue: nutrients.potassiumValue + (todayTotals['potassium'] ?? 0),
+        phosphorusValue: nutrients.phosphorusValue + (todayTotals['phosphorus'] ?? 0),
+        proteinValue: nutrients.proteinValue + (todayTotals['protein'] ?? 0),
+        source: nutrients.source,
+      );
+
+      logger.info('Assessing dietary risk (cumulative)...');
       final riskAssessment = riskAssessmentEngine.evaluateRisk(
-        nutrients: nutrients,
+        nutrients: cumulativeNutrients,
         profile: userProfile,
       );
       logger.info('Risk assessment complete: ${riskAssessment.riskLevel.displayText}');
