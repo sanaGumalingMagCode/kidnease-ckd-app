@@ -11,6 +11,7 @@ class DietaryProfileModel {
   final double dailyProteinLimit;
   final int ckdStage;
   final Timestamp lastUpdated;
+  final String? profilePhotoUrl;
 
   const DietaryProfileModel({
     required this.profileId,
@@ -21,6 +22,7 @@ class DietaryProfileModel {
     required this.dailyProteinLimit,
     required this.ckdStage,
     required this.lastUpdated,
+    this.profilePhotoUrl,
   });
 
   /// Convert from Firestore document to DietaryProfileModel
@@ -35,6 +37,7 @@ class DietaryProfileModel {
       dailyProteinLimit: (data['dailyProteinLimit'] as num).toDouble(),
       ckdStage: data['ckdStage'] as int,
       lastUpdated: data['lastUpdated'] as Timestamp,
+      profilePhotoUrl: data['profilePhotoUrl'] as String?,
     );
   }
 
@@ -49,6 +52,7 @@ class DietaryProfileModel {
       'dailyProteinLimit': dailyProteinLimit,
       'ckdStage': ckdStage,
       'lastUpdated': lastUpdated,
+      if (profilePhotoUrl != null) 'profilePhotoUrl': profilePhotoUrl,
     };
   }
 
@@ -63,6 +67,7 @@ class DietaryProfileModel {
       dailyProteinLimit: dailyProteinLimit,
       ckdStage: ckdStage,
       lastUpdated: lastUpdated.toDate(),
+      profilePhotoUrl: profilePhotoUrl,
     );
   }
 
@@ -77,6 +82,7 @@ class DietaryProfileModel {
       dailyProteinLimit: profile.dailyProteinLimit,
       ckdStage: profile.ckdStage,
       lastUpdated: Timestamp.fromDate(profile.lastUpdated),
+      profilePhotoUrl: profile.profilePhotoUrl,
     );
   }
 }

@@ -9,8 +9,9 @@ class DietaryProfile {
   final double dailyPotassiumLimit; // mg
   final double dailyPhosphorusLimit; // mg
   final double dailyProteinLimit; // g
-  final int ckdStage; // 1-5
+  final int ckdStage; // 0-5 (0 = Prevention/Healthy, 1-5 = CKD Stages)
   final DateTime lastUpdated;
+  final String? profilePhotoUrl; // Optional profile photo URL
 
   const DietaryProfile({
     required this.profileId,
@@ -21,6 +22,7 @@ class DietaryProfile {
     required this.dailyProteinLimit,
     required this.ckdStage,
     required this.lastUpdated,
+    this.profilePhotoUrl,
   });
 
   /// Check if the profile limits are within KDIGO-recommended range
@@ -75,6 +77,7 @@ class DietaryProfile {
     double? dailyProteinLimit,
     int? ckdStage,
     DateTime? lastUpdated,
+    String? profilePhotoUrl,
   }) {
     return DietaryProfile(
       profileId: profileId ?? this.profileId,
@@ -85,6 +88,7 @@ class DietaryProfile {
       dailyProteinLimit: dailyProteinLimit ?? this.dailyProteinLimit,
       ckdStage: ckdStage ?? this.ckdStage,
       lastUpdated: lastUpdated ?? this.lastUpdated,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 
@@ -100,7 +104,8 @@ class DietaryProfile {
         other.dailyPhosphorusLimit == dailyPhosphorusLimit &&
         other.dailyProteinLimit == dailyProteinLimit &&
         other.ckdStage == ckdStage &&
-        other.lastUpdated == lastUpdated;
+        other.lastUpdated == lastUpdated &&
+        other.profilePhotoUrl == profilePhotoUrl;
   }
 
   @override
@@ -112,11 +117,12 @@ class DietaryProfile {
         dailyPhosphorusLimit.hashCode ^
         dailyProteinLimit.hashCode ^
         ckdStage.hashCode ^
-        lastUpdated.hashCode;
+        lastUpdated.hashCode ^
+        profilePhotoUrl.hashCode;
   }
 
   @override
   String toString() {
-    return 'DietaryProfile(profileId: $profileId, userId: $userId, dailySodiumLimit: $dailySodiumLimit, dailyPotassiumLimit: $dailyPotassiumLimit, dailyPhosphorusLimit: $dailyPhosphorusLimit, dailyProteinLimit: $dailyProteinLimit, ckdStage: $ckdStage, lastUpdated: $lastUpdated)';
+    return 'DietaryProfile(profileId: $profileId, userId: $userId, dailySodiumLimit: $dailySodiumLimit, dailyPotassiumLimit: $dailyPotassiumLimit, dailyPhosphorusLimit: $dailyPhosphorusLimit, dailyProteinLimit: $dailyProteinLimit, ckdStage: $ckdStage, lastUpdated: $lastUpdated, profilePhotoUrl: $profilePhotoUrl)';
   }
 }

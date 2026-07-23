@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../../../core/constants/kdigo_limits.dart';
+import '../../../../core/utils/logger.dart';
 import '../../../../shared/providers/providers.dart';
 import '../../../dietary_profile/domain/entities/dietary_profile.dart';
 
@@ -131,7 +132,7 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                   _pickImage(ImageSource.gallery);
                 },
               ),
-              if (_profileImage != null)
+              if (_profileImage != null || widget.existingProfile?.profilePhotoUrl != null)
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(10),
@@ -216,9 +217,11 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                         radius: 60,
                         backgroundColor: const Color(0xFF4A90E2).withOpacity(0.1),
                         backgroundImage: _profileImage != null
-                            ? FileImage(_profileImage!)
-                            : null,
-                        child: _profileImage == null
+                            ? FileImage(_profileImage!) as ImageProvider
+                            : (widget.existingProfile?.profilePhotoUrl != null
+                                ? NetworkImage(widget.existingProfile!.profilePhotoUrl!)
+                                : null),
+                        child: (_profileImage == null && widget.existingProfile?.profilePhotoUrl == null)
                             ? const Icon(
                                 Icons.person,
                                 size: 60,
@@ -582,6 +585,22 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
+      String? photoUrl = widget.existingProfile?.profilePhotoUrl;
+
+      // Upload profile photo if a new one was selected
+      if (_profileImage != null) {
+        try {
+          final storageRepo = ref.read(cloudStorageRepositoryProvider);
+          photoUrl = await storageRepo.uploadProfilePhoto(
+            userId: widget.userId,
+            imageFile: _profileImage!,
+          );
+        } catch (e) {
+          // Non-critical error, continue without photo
+          logger.warning('Failed to upload profile photo: $e');
+        }
+      }
+
       final profile = DietaryProfile(
         profileId: widget.existingProfile?.profileId ??
             DateTime.now().millisecondsSinceEpoch.toString(),
@@ -592,6 +611,7 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
         dailyProteinLimit: double.parse(_proteinController.text),
         ckdStage: _selectedCkdStage,
         lastUpdated: DateTime.now(),
+        profilePhotoUrl: photoUrl,
       );
 
       final profileRepo = ref.read(dietaryProfileRepositoryProvider);

@@ -8,6 +8,9 @@ abstract class CloudStorageRepository {
   /// Upload an image and return the download URL
   Future<String> uploadImage(File imageFile, String userId);
 
+  /// Upload a profile photo and return the download URL
+  Future<String> uploadProfilePhoto({required String userId, required File imageFile});
+
   /// Delete an image from storage
   Future<void> deleteImage(String imageUrl);
 
@@ -23,6 +26,100 @@ class FirebaseCloudStorageRepository implements CloudStorageRepository {
 
   FirebaseCloudStorageRepository({FirebaseStorage? storage})
       : _storage = storage ?? FirebaseStorage.instance;
+
+  @override
+  Future<String> uploadProfilePhoto({required String userId, required File imageFile}) async {
+    int retryCount = 0;
+    Exception? lastException;
+
+    while (retryCount < _maxRetries) {
+      try {
+        // Use consistent filename for profile photo (will overwrite old photo)
+        final fileName = 'profile_photo.jpg';
+        final path = 'users/$userId/profile/$fileName';
+
+        logger.info('Uploading profile photo to Firebase Storage', context: {
+          'path': path,
+          'userId': userId,
+          'attempt': retryCount + 1,
+        });
+
+        // Create reference
+        final ref = _storage.ref().child(path);
+
+        // Upload file with metadata
+        final uploadTask = ref.putFile(
+          imageFile,
+          SettableMetadata(
+            contentType: 'image/jpeg',
+            customMetadata: {
+              'uploadedAt': DateTime.now().toIso8601String(),
+              'userId': userId,
+              'type': 'profile_photo',
+            },
+          ),
+        );
+
+        // Wait for upload with timeout
+        final snapshot = await uploadTask.timeout(
+          _uploadTimeout,
+          onTimeout: () {
+            throw NetworkException.timeout();
+          },
+        );
+
+        // Get download URL
+        final downloadUrl = await ref.getDownloadURL();
+
+        logger.info('Profile photo uploaded successfully', context: {
+          'path': path,
+          'url': downloadUrl,
+          'size': snapshot.totalBytes,
+        });
+
+        return downloadUrl;
+      } on FirebaseException catch (e) {
+        lastException = e;
+        logger.error('Firebase Storage error uploading profile photo', error: e, context: {
+          'code': e.code,
+          'attempt': retryCount + 1,
+        });
+
+        if (e.code == 'quota-exceeded') {
+          throw StorageException.quotaExceeded();
+        } else if (e.code == 'unauthorized' || e.code == 'unauthenticated') {
+          throw StorageException.permissionDenied();
+        } else if (e.code == 'canceled') {
+          throw const StorageException('Upload canceled');
+        }
+
+        if (e.code == 'unknown' || e.code == 'unavailable') {
+          retryCount++;
+          if (retryCount < _maxRetries) {
+            await Future.delayed(Duration(seconds: 2 * retryCount));
+            continue;
+          }
+        }
+
+        throw StorageException.uploadFailed();
+      } catch (e, stackTrace) {
+        lastException = e as Exception?;
+        logger.error('Unexpected profile photo upload error', error: e, stackTrace: stackTrace);
+
+        retryCount++;
+        if (retryCount < _maxRetries) {
+          await Future.delayed(Duration(seconds: 2 * retryCount));
+          continue;
+        }
+
+        throw StorageException('Profile photo upload failed: ${e.toString()}');
+      }
+    }
+
+    throw StorageException(
+      'Profile photo upload failed after $_maxRetries attempts: ${lastException?.toString()}',
+    );
+  }
 
   @override
   Future<String> uploadImage(File imageFile, String userId) async {
