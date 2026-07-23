@@ -96,13 +96,18 @@ class GeminiApiClientImpl implements GeminiApiClient {
           }
         };
 
-        // Make API request
-        final uri = Uri.parse('${ApiEndpoints.geminiGenerateContent}?key=$_apiKey');
+        // Make API request - use x-goog-api-key header (works for both AIzaSy and AQ. key formats)
+        final uri = Uri.parse(ApiEndpoints.geminiGenerateContent);
+
+        final headers = {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': _apiKey,
+        };
         
         final response = await _client
             .post(
               uri,
-              headers: {'Content-Type': 'application/json'},
+              headers: headers,
               body: jsonEncode(requestBody),
             )
             .timeout(
