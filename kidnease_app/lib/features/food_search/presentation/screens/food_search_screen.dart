@@ -17,7 +17,7 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
   NutritionalData? _baseNutritionalData; // Store base data for portion calculation
   String? _errorMessage;
   double _selectedPortion = 100.0; // Default portion size in grams
-  final List<double> _portionSizes = [25, 50, 75, 100, 150, 200, 250, 300];
+  final List<double> _portionSizes = [100, 200, 250, 300];
 
   @override
   void dispose() {
