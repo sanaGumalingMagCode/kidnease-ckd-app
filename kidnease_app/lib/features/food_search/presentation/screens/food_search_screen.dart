@@ -60,7 +60,8 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
         } else {
           _errorMessage = 'No food found with that name. Try these:\n\n'
               'Common Foods:\n• Banana  • White Rice  • Brown Rice\n• Chicken  • Milk  • Wheat Bread\n\n'
-              'Filipino Dishes:\n• Adobo  • Sinigang  • Kare Kare\n• Leche Flan  • Tinola  • Lumpia';
+              'Filipino Dishes:\n• Adobo  • Sinigang  • Kare Kare\n• Leche Flan  • Tinola  • Lumpia\n\n'
+              'Fast Food:\n• Chickenjoy  • Yumburger  • Big Mac\n• KFC Chicken  • Mang Inasal  • Pizza';
         }
       });
     } catch (e) {
@@ -559,6 +560,412 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
         potassium: 380.0, // High from ube
         phosphorus: 95.0,
         protein: 2.8,
+      ),
+      
+      // Fast Food - Jollibee
+      'chickenjoy': NutritionalData(
+        productName: 'Jollibee Chickenjoy (1 piece)',
+        servingSize: '100g',
+        sodium: 890.0, // Very high sodium
+        potassium: 280.0,
+        phosphorus: 250.0,
+        protein: 24.0,
+      ),
+      'jollibee chickenjoy': NutritionalData(
+        productName: 'Jollibee Chickenjoy (1 piece)',
+        servingSize: '100g',
+        sodium: 890.0,
+        potassium: 280.0,
+        phosphorus: 250.0,
+        protein: 24.0,
+      ),
+      'jolly spaghetti': NutritionalData(
+        productName: 'Jollibee Jolly Spaghetti',
+        servingSize: '100g',
+        sodium: 650.0, // High sodium
+        potassium: 220.0,
+        phosphorus: 120.0,
+        protein: 8.5,
+      ),
+      'jollibee spaghetti': NutritionalData(
+        productName: 'Jollibee Jolly Spaghetti',
+        servingSize: '100g',
+        sodium: 650.0,
+        potassium: 220.0,
+        phosphorus: 120.0,
+        protein: 8.5,
+      ),
+      'yumburger': NutritionalData(
+        productName: 'Jollibee Yumburger',
+        servingSize: '100g',
+        sodium: 720.0, // High sodium
+        potassium: 180.0,
+        phosphorus: 160.0,
+        protein: 14.0,
+      ),
+      'jollibee burger': NutritionalData(
+        productName: 'Jollibee Yumburger',
+        servingSize: '100g',
+        sodium: 720.0,
+        potassium: 180.0,
+        phosphorus: 160.0,
+        protein: 14.0,
+      ),
+      'jolly hotdog': NutritionalData(
+        productName: 'Jollibee Jolly Hotdog',
+        servingSize: '100g',
+        sodium: 920.0, // Very high sodium
+        potassium: 160.0,
+        phosphorus: 145.0,
+        protein: 12.0,
+      ),
+      'palabok': NutritionalData(
+        productName: 'Jollibee Palabok Fiesta',
+        servingSize: '100g',
+        sodium: 780.0, // High sodium
+        potassium: 200.0,
+        phosphorus: 180.0,
+        protein: 10.5,
+      ),
+      'jollibee palabok': NutritionalData(
+        productName: 'Jollibee Palabok Fiesta',
+        servingSize: '100g',
+        sodium: 780.0,
+        potassium: 200.0,
+        phosphorus: 180.0,
+        protein: 10.5,
+      ),
+      'peach mango pie': NutritionalData(
+        productName: 'Jollibee Peach Mango Pie',
+        servingSize: '100g',
+        sodium: 240.0,
+        potassium: 150.0,
+        phosphorus: 65.0,
+        protein: 3.2,
+      ),
+      'jollibee pie': NutritionalData(
+        productName: 'Jollibee Peach Mango Pie',
+        servingSize: '100g',
+        sodium: 240.0,
+        potassium: 150.0,
+        phosphorus: 65.0,
+        protein: 3.2,
+      ),
+      
+      // Fast Food - McDonald's
+      'big mac': NutritionalData(
+        productName: 'McDonald\'s Big Mac',
+        servingSize: '100g',
+        sodium: 460.0, // High sodium
+        potassium: 140.0,
+        phosphorus: 130.0,
+        protein: 12.5,
+      ),
+      'mcdonalds burger': NutritionalData(
+        productName: 'McDonald\'s Big Mac',
+        servingSize: '100g',
+        sodium: 460.0,
+        potassium: 140.0,
+        phosphorus: 130.0,
+        protein: 12.5,
+      ),
+      'chicken mcdo': NutritionalData(
+        productName: 'McDonald\'s Fried Chicken',
+        servingSize: '100g',
+        sodium: 820.0, // High sodium
+        potassium: 260.0,
+        phosphorus: 240.0,
+        protein: 23.0,
+      ),
+      'mcnuggets': NutritionalData(
+        productName: 'McDonald\'s Chicken McNuggets',
+        servingSize: '100g',
+        sodium: 680.0,
+        potassium: 180.0,
+        phosphorus: 200.0,
+        protein: 16.5,
+      ),
+      'chicken nuggets': NutritionalData(
+        productName: 'McDonald\'s Chicken McNuggets',
+        servingSize: '100g',
+        sodium: 680.0,
+        potassium: 180.0,
+        phosphorus: 200.0,
+        protein: 16.5,
+      ),
+      'french fries': NutritionalData(
+        productName: 'French Fries (Fast Food)',
+        servingSize: '100g',
+        sodium: 210.0,
+        potassium: 450.0, // High potassium!
+        phosphorus: 120.0,
+        protein: 3.4,
+      ),
+      'fries': NutritionalData(
+        productName: 'French Fries (Fast Food)',
+        servingSize: '100g',
+        sodium: 210.0,
+        potassium: 450.0, // High potassium!
+        phosphorus: 120.0,
+        protein: 3.4,
+      ),
+      'mcflurry': NutritionalData(
+        productName: 'McDonald\'s McFlurry',
+        servingSize: '100g',
+        sodium: 95.0,
+        potassium: 180.0,
+        phosphorus: 140.0, // High from milk
+        protein: 5.5,
+      ),
+      
+      // Fast Food - KFC
+      'kfc chicken': NutritionalData(
+        productName: 'KFC Fried Chicken',
+        servingSize: '100g',
+        sodium: 850.0, // Very high sodium
+        potassium: 270.0,
+        phosphorus: 260.0,
+        protein: 25.0,
+      ),
+      'kfc': NutritionalData(
+        productName: 'KFC Fried Chicken',
+        servingSize: '100g',
+        sodium: 850.0,
+        potassium: 270.0,
+        phosphorus: 260.0,
+        protein: 25.0,
+      ),
+      'zinger': NutritionalData(
+        productName: 'KFC Zinger Burger',
+        servingSize: '100g',
+        sodium: 740.0,
+        potassium: 190.0,
+        phosphorus: 170.0,
+        protein: 13.5,
+      ),
+      'kfc zinger': NutritionalData(
+        productName: 'KFC Zinger Burger',
+        servingSize: '100g',
+        sodium: 740.0,
+        potassium: 190.0,
+        phosphorus: 170.0,
+        protein: 13.5,
+      ),
+      'mashed potato': NutritionalData(
+        productName: 'KFC Mashed Potato with Gravy',
+        servingSize: '100g',
+        sodium: 420.0, // High sodium from gravy
+        potassium: 320.0, // High from potato
+        phosphorus: 65.0,
+        protein: 2.8,
+      ),
+      'coleslaw': NutritionalData(
+        productName: 'KFC Coleslaw',
+        servingSize: '100g',
+        sodium: 240.0,
+        potassium: 180.0,
+        phosphorus: 45.0,
+        protein: 1.5,
+      ),
+      
+      // Fast Food - Chowking
+      'chowking': NutritionalData(
+        productName: 'Chowking Pork Chao Fan',
+        servingSize: '100g',
+        sodium: 680.0, // High sodium
+        potassium: 190.0,
+        phosphorus: 140.0,
+        protein: 9.5,
+      ),
+      'chao fan': NutritionalData(
+        productName: 'Chowking Pork Chao Fan',
+        servingSize: '100g',
+        sodium: 680.0,
+        potassium: 190.0,
+        phosphorus: 140.0,
+        protein: 9.5,
+      ),
+      'wonton soup': NutritionalData(
+        productName: 'Chowking Wonton Soup',
+        servingSize: '100g',
+        sodium: 720.0, // Very high sodium
+        potassium: 150.0,
+        phosphorus: 95.0,
+        protein: 7.5,
+      ),
+      'siomai': NutritionalData(
+        productName: 'Chowking Pork Siomai',
+        servingSize: '100g',
+        sodium: 620.0,
+        potassium: 170.0,
+        phosphorus: 160.0,
+        protein: 12.0,
+      ),
+      'chowking siomai': NutritionalData(
+        productName: 'Chowking Pork Siomai',
+        servingSize: '100g',
+        sodium: 620.0,
+        potassium: 170.0,
+        phosphorus: 160.0,
+        protein: 12.0,
+      ),
+      'lauriat': NutritionalData(
+        productName: 'Chowking Lauriat (Mixed Meal)',
+        servingSize: '100g',
+        sodium: 580.0,
+        potassium: 210.0,
+        phosphorus: 130.0,
+        protein: 11.0,
+      ),
+      
+      // Fast Food - Mang Inasal
+      'mang inasal': NutritionalData(
+        productName: 'Mang Inasal Chicken Inasal',
+        servingSize: '100g',
+        sodium: 750.0, // High sodium
+        potassium: 310.0,
+        phosphorus: 230.0,
+        protein: 26.0,
+      ),
+      'chicken inasal': NutritionalData(
+        productName: 'Mang Inasal Chicken Inasal',
+        servingSize: '100g',
+        sodium: 750.0,
+        potassium: 310.0,
+        phosphorus: 230.0,
+        protein: 26.0,
+      ),
+      'inasal': NutritionalData(
+        productName: 'Mang Inasal Chicken Inasal',
+        servingSize: '100g',
+        sodium: 750.0,
+        potassium: 310.0,
+        phosphorus: 230.0,
+        protein: 26.0,
+      ),
+      'pork bbq': NutritionalData(
+        productName: 'Mang Inasal Pork BBQ',
+        servingSize: '100g',
+        sodium: 820.0, // Very high sodium
+        potassium: 350.0,
+        phosphorus: 240.0,
+        protein: 24.0,
+      ),
+      
+      // Fast Food - Greenwich
+      'greenwich': NutritionalData(
+        productName: 'Greenwich Lasagna Supreme',
+        servingSize: '100g',
+        sodium: 590.0,
+        potassium: 210.0,
+        phosphorus: 180.0, // High from cheese
+        protein: 11.5,
+      ),
+      'lasagna': NutritionalData(
+        productName: 'Greenwich Lasagna Supreme',
+        servingSize: '100g',
+        sodium: 590.0,
+        potassium: 210.0,
+        phosphorus: 180.0,
+        protein: 11.5,
+      ),
+      'pizza': NutritionalData(
+        productName: 'Pizza (Cheese)',
+        servingSize: '100g',
+        sodium: 640.0, // High sodium
+        potassium: 170.0,
+        phosphorus: 200.0, // High from cheese
+        protein: 12.0,
+      ),
+      'greenwich pizza': NutritionalData(
+        productName: 'Greenwich Pizza (Cheese)',
+        servingSize: '100g',
+        sodium: 640.0,
+        potassium: 170.0,
+        phosphorus: 200.0,
+        protein: 12.0,
+      ),
+      
+      // Additional Common Fast Foods
+      'burger': NutritionalData(
+        productName: 'Burger (Generic Fast Food)',
+        servingSize: '100g',
+        sodium: 520.0,
+        potassium: 160.0,
+        phosphorus: 140.0,
+        protein: 13.0,
+      ),
+      'cheeseburger': NutritionalData(
+        productName: 'Cheeseburger (Fast Food)',
+        servingSize: '100g',
+        sodium: 680.0, // Higher sodium with cheese
+        potassium: 170.0,
+        phosphorus: 180.0, // Higher with cheese
+        protein: 14.5,
+      ),
+      'hotdog': NutritionalData(
+        productName: 'Hotdog (Fast Food)',
+        servingSize: '100g',
+        sodium: 810.0, // Very high sodium
+        potassium: 150.0,
+        phosphorus: 130.0,
+        protein: 11.5,
+      ),
+      'hot dog': NutritionalData(
+        productName: 'Hotdog (Fast Food)',
+        servingSize: '100g',
+        sodium: 810.0,
+        potassium: 150.0,
+        phosphorus: 130.0,
+        protein: 11.5,
+      ),
+      'onion rings': NutritionalData(
+        productName: 'Onion Rings (Fast Food)',
+        servingSize: '100g',
+        sodium: 380.0,
+        potassium: 160.0,
+        phosphorus: 90.0,
+        protein: 4.2,
+      ),
+      'sundae': NutritionalData(
+        productName: 'Ice Cream Sundae (Fast Food)',
+        servingSize: '100g',
+        sodium: 75.0,
+        potassium: 160.0,
+        phosphorus: 110.0, // High from milk
+        protein: 4.5,
+      ),
+      'soft drink': NutritionalData(
+        productName: 'Soft Drink / Soda',
+        servingSize: '100g',
+        sodium: 8.0,
+        potassium: 2.0,
+        phosphorus: 12.0, // Contains phosphoric acid
+        protein: 0.0,
+      ),
+      'soda': NutritionalData(
+        productName: 'Soft Drink / Soda',
+        servingSize: '100g',
+        sodium: 8.0,
+        potassium: 2.0,
+        phosphorus: 12.0,
+        protein: 0.0,
+      ),
+      'coke': NutritionalData(
+        productName: 'Coca-Cola / Soft Drink',
+        servingSize: '100g',
+        sodium: 8.0,
+        potassium: 2.0,
+        phosphorus: 12.0, // Contains phosphoric acid
+        protein: 0.0,
+      ),
+      'iced tea': NutritionalData(
+        productName: 'Iced Tea (Sweetened)',
+        servingSize: '100g',
+        sodium: 6.0,
+        potassium: 15.0,
+        phosphorus: 3.0,
+        protein: 0.1,
       ),
     };
 
