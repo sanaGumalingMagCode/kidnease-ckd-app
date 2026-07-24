@@ -7,7 +7,7 @@ import '../../../../core/utils/logger.dart';
 /// Free, no rate limits, 400K+ foods, government-verified data
 class USDAApiClient {
   static const String _baseUrl = 'https://api.nal.usda.gov/fdc/v1';
-  static const String _apiKey = 'DEMO_KEY'; // Replace with your key from https://fdc.nal.usda.gov/api-key-signup.html
+  static const String _apiKey = '14ipfNjDrxxzR5wbyq5pt9ZceOhd2KVzmrk8i0ElH'; // Your USDA API key
   
   final http.Client _client;
 
