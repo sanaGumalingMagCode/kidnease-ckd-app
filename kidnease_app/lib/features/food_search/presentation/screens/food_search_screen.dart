@@ -14,7 +14,10 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   NutritionalData? _searchResult;
+  NutritionalData? _baseNutritionalData; // Store base data for portion calculation
   String? _errorMessage;
+  double _selectedPortion = 100.0; // Default portion size in grams
+  final List<double> _portionSizes = [25, 50, 75, 100, 150, 200, 250, 300];
 
   @override
   void dispose() {
@@ -35,6 +38,8 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       _isSearching = true;
       _errorMessage = null;
       _searchResult = null;
+      _baseNutritionalData = null;
+      _selectedPortion = 100.0;
     });
 
     try {
@@ -50,10 +55,11 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       setState(() {
         _isSearching = false;
         if (result != null) {
+          _baseNutritionalData = result; // Store base data
           _searchResult = result;
         } else {
           _errorMessage = 'No food found with that name. Try these:\n\n'
-              'Common Foods:\n• Banana  • White Rice  • Chicken\n• Milk  • Egg  • Bread\n\n'
+              'Common Foods:\n• Banana  • White Rice  • Brown Rice\n• Chicken  • Milk  • Wheat Bread\n\n'
               'Filipino Dishes:\n• Adobo  • Sinigang  • Kare Kare\n• Leche Flan  • Tinola  • Lumpia';
         }
       });
@@ -63,6 +69,25 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
         _errorMessage = 'Error searching food: ${e.toString()}';
       });
     }
+  }
+
+  void _updatePortionSize(double newPortion) {
+    if (_baseNutritionalData == null) return;
+
+    final base = _baseNutritionalData!;
+    final ratio = newPortion / 100.0;
+
+    setState(() {
+      _selectedPortion = newPortion;
+      _searchResult = NutritionalData(
+        productName: '${base.productName}',
+        servingSize: '${newPortion.toInt()}g',
+        sodium: base.sodium * ratio,
+        potassium: base.potassium * ratio,
+        phosphorus: base.phosphorus * ratio,
+        protein: base.protein * ratio,
+      );
+    });
   }
 
   // Fallback database for common foods (CKD-relevant nutritional data)
@@ -79,19 +104,11 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       ),
       'white rice': NutritionalData(
         productName: 'White Rice (cooked)',
-        servingSize: '1 cup (158g)',
-        sodium: 2.0,
-        potassium: 55.0,
-        phosphorus: 43.0,
-        protein: 4.3,
-      ),
-      'rice': NutritionalData(
-        productName: 'White Rice (cooked)',
-        servingSize: '1 cup (158g)',
-        sodium: 2.0,
-        potassium: 55.0,
-        phosphorus: 43.0,
-        protein: 4.3,
+        servingSize: '100g',
+        sodium: 1.3,
+        potassium: 35.0,
+        phosphorus: 27.0,
+        protein: 2.7,
       ),
       'chicken': NutritionalData(
         productName: 'Chicken Breast (cooked)',
@@ -127,11 +144,147 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       ),
       'bread': NutritionalData(
         productName: 'White Bread',
-        servingSize: '1 slice (25g)',
-        sodium: 147.0,
-        potassium: 26.0,
-        phosphorus: 24.0,
-        protein: 2.3,
+        servingSize: '100g',
+        sodium: 588.0,
+        potassium: 104.0,
+        phosphorus: 96.0,
+        protein: 9.2,
+      ),
+      'white bread': NutritionalData(
+        productName: 'White Bread',
+        servingSize: '100g',
+        sodium: 588.0,
+        potassium: 104.0,
+        phosphorus: 96.0,
+        protein: 9.2,
+      ),
+      'wheat bread': NutritionalData(
+        productName: 'Whole Wheat Bread',
+        servingSize: '100g',
+        sodium: 400.0,
+        potassium: 220.0,
+        phosphorus: 180.0,
+        protein: 12.0,
+      ),
+      'whole wheat bread': NutritionalData(
+        productName: 'Whole Wheat Bread',
+        servingSize: '100g',
+        sodium: 400.0,
+        potassium: 220.0,
+        phosphorus: 180.0,
+        protein: 12.0,
+      ),
+      'brown bread': NutritionalData(
+        productName: 'Brown Bread',
+        servingSize: '100g',
+        sodium: 480.0,
+        potassium: 200.0,
+        phosphorus: 170.0,
+        protein: 11.0,
+      ),
+      'multigrain bread': NutritionalData(
+        productName: 'Multigrain Bread',
+        servingSize: '100g',
+        sodium: 420.0,
+        potassium: 240.0,
+        phosphorus: 190.0,
+        protein: 13.0,
+      ),
+      'rye bread': NutritionalData(
+        productName: 'Rye Bread',
+        servingSize: '100g',
+        sodium: 660.0,
+        potassium: 180.0,
+        phosphorus: 125.0,
+        protein: 8.5,
+      ),
+      'sourdough bread': NutritionalData(
+        productName: 'Sourdough Bread',
+        servingSize: '100g',
+        sodium: 580.0,
+        potassium: 115.0,
+        phosphorus: 92.0,
+        protein: 9.0,
+      ),
+      'pandesal': NutritionalData(
+        productName: 'Pandesal (Filipino Bread Roll)',
+        servingSize: '100g',
+        sodium: 520.0,
+        potassium: 95.0,
+        phosphorus: 88.0,
+        protein: 8.5,
+      ),
+      'rice': NutritionalData(
+        productName: 'White Rice (cooked)',
+        servingSize: '100g',
+        sodium: 1.3,
+        potassium: 35.0,
+        phosphorus: 27.0,
+        protein: 2.7,
+      ),
+      'white rice': NutritionalData(
+        productName: 'White Rice (cooked)',
+        servingSize: '100g',
+        sodium: 1.3,
+        potassium: 35.0,
+        phosphorus: 27.0,
+        protein: 2.7,
+      ),
+      'brown rice': NutritionalData(
+        productName: 'Brown Rice (cooked)',
+        servingSize: '100g',
+        sodium: 5.0,
+        potassium: 86.0, // Higher potassium
+        phosphorus: 83.0, // Much higher phosphorus
+        protein: 2.6,
+      ),
+      'jasmine rice': NutritionalData(
+        productName: 'Jasmine Rice (cooked)',
+        servingSize: '100g',
+        sodium: 1.0,
+        potassium: 38.0,
+        phosphorus: 30.0,
+        protein: 2.8,
+      ),
+      'basmati rice': NutritionalData(
+        productName: 'Basmati Rice (cooked)',
+        servingSize: '100g',
+        sodium: 2.0,
+        potassium: 40.0,
+        phosphorus: 32.0,
+        protein: 3.0,
+      ),
+      'red rice': NutritionalData(
+        productName: 'Red Rice (cooked)',
+        servingSize: '100g',
+        sodium: 4.0,
+        potassium: 95.0, // High potassium
+        phosphorus: 90.0, // High phosphorus
+        protein: 3.5,
+      ),
+      'black rice': NutritionalData(
+        productName: 'Black Rice (cooked)',
+        servingSize: '100g',
+        sodium: 3.0,
+        potassium: 100.0, // High potassium
+        phosphorus: 95.0, // High phosphorus
+        protein: 4.0,
+      ),
+      'fried rice': NutritionalData(
+        productName: 'Fried Rice',
+        servingSize: '100g',
+        sodium: 380.0, // Much higher from soy sauce
+        potassium: 80.0,
+        phosphorus: 60.0,
+        protein: 4.5,
+      ),
+      'glutinous rice': NutritionalData(
+        productName: 'Glutinous Rice / Sticky Rice (cooked)',
+        servingSize: '100g',
+        sodium: 2.0,
+        potassium: 25.0,
+        phosphorus: 18.0,
+        protein: 2.2,
       ),
       'apple': NutritionalData(
         productName: 'Apple (medium)',
@@ -675,6 +828,88 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
                       ),
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+
+          // Portion Size Selector
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF4A90E2).withValues(alpha: 0.05),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.scale,
+                      size: 20,
+                      color: Color(0xFF4A90E2),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Portion Size:',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4A90E2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<double>(
+                        value: _selectedPortion,
+                        underline: const SizedBox(),
+                        dropdownColor: Colors.white,
+                        icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        items: _portionSizes.map((size) {
+                          return DropdownMenuItem<double>(
+                            value: size,
+                            child: Text(
+                              '${size.toInt()}g',
+                              style: const TextStyle(
+                                color: Color(0xFF2C3E50),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (newValue) {
+                          if (newValue != null) {
+                            _updatePortionSize(newValue);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Select portion size to adjust nutritional values',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
               ],
             ),

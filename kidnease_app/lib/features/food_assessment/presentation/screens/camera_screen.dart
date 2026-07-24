@@ -435,13 +435,30 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
           color: Colors.red,
         );
       }
-    } catch (e) {
+    } on CameraException catch (e) {
       if (mounted) {
         _showErrorDialog(
-          'Unexpected Error',
-          'An unexpected error occurred: $e',
-          icon: Icons.error,
+          'Camera Error',
+          e.message,
+          icon: Icons.camera_alt_outlined,
+          color: Colors.orange,
+          showGalleryOption: true, // Show gallery option when camera fails
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        // Check if it's a camera-related error
+        final isCameraError = e.toString().toLowerCase().contains('camera') ||
+            e.toString().toLowerCase().contains('permission');
+        
+        _showErrorDialog(
+          isCameraError ? 'Camera Error' : 'Unexpected Error',
+          isCameraError 
+              ? 'Camera access failed. This might be due to permissions or emulator limitations.'
+              : 'An unexpected error occurred: $e',
+          icon: isCameraError ? Icons.camera_alt_outlined : Icons.error,
           color: Colors.red,
+          showGalleryOption: isCameraError,
         );
       }
     } finally {
@@ -484,6 +501,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     String message, {
     required IconData icon,
     required Color color,
+    bool showGalleryOption = false,
   }) {
     showDialog(
       context: context,
@@ -492,11 +510,54 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
           children: [
             Icon(icon, color: color),
             const SizedBox(width: 12),
-            Text(title),
+            Expanded(child: Text(title)),
           ],
         ),
-        content: Text(message),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            if (showGalleryOption) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Try using Gallery instead to upload a photo from your device.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
+          if (showGalleryOption)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _captureAndAssess(ImageSource.gallery);
+              },
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Use Gallery'),
+            ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),

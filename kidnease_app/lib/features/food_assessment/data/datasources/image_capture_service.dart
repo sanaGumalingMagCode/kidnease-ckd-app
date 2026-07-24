@@ -26,35 +26,49 @@ class CameraImageCaptureService implements ImageCaptureService {
   @override
   Future<File> captureImage() async {
     try {
+      logger.info('Attempting to open camera...');
+      
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.rear,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
       );
 
       if (photo == null) {
-        throw CameraException.captureFailed();
+        logger.warning('Camera capture canceled by user');
+        throw CameraException('Camera capture was canceled');
       }
+
+      final capturedFile = File(photo.path);
+      final fileSize = await capturedFile.length();
 
       logger.info('Image captured successfully', context: {
         'path': photo.path,
-        'size': await File(photo.path).length(),
+        'size': fileSize,
       });
 
-      return File(photo.path);
+      return capturedFile;
+    } on CameraException {
+      rethrow;
     } catch (e, stackTrace) {
-      if (e is CameraException) {
-        rethrow;
-      }
-
       logger.error('Error capturing image', error: e, stackTrace: stackTrace);
 
       // Check for specific error types
-      if (e.toString().contains('camera_access_denied') ||
-          e.toString().contains('permission')) {
-        throw CameraException.accessDenied();
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('camera_access_denied') ||
+          errorString.contains('permission') ||
+          errorString.contains('denied')) {
+        throw CameraException('Camera permission denied. Please enable camera access in settings.');
       }
 
-      throw CameraException.captureFailed();
+      if (errorString.contains('camera not available') ||
+          errorString.contains('no camera')) {
+        throw CameraException('Camera not available. This device may not have a camera or the camera is being used by another app.');
+      }
+
+      throw CameraException('Failed to capture image. Please try using gallery instead.');
     }
   }
 
