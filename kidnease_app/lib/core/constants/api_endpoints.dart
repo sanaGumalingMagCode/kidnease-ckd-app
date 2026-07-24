@@ -3,8 +3,10 @@
 class ApiEndpoints {
   // OpenRouter API (replaces Gemini - permanent API key, free tier available)
   static const String openRouterBaseUrl = 'https://openrouter.ai/api/v1';
-  // Free vision model - supports image analysis
-  static const String openRouterModel = 'nvidia/nemotron-nano-12b-v2-vl:free';
+  // Free Models Router - automatically picks a working free vision model
+  static const String openRouterModel = 'openrouter/free';
+  // Explicit fallback if router fails
+  static const String openRouterModelFallback = 'meta-llama/llama-3.2-11b-vision-instruct:free';
   static String get openRouterChat => '$openRouterBaseUrl/chat/completions';
 
   // FatSecret API

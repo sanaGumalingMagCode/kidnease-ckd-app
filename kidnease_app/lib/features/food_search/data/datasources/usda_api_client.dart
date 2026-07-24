@@ -7,75 +7,96 @@ import '../../../../core/utils/logger.dart';
 /// Free, no rate limits, 400K+ foods, government-verified data
 class USDAApiClient {
   static const String _baseUrl = 'https://api.nal.usda.gov/fdc/v1';
-  static const String _apiKey = '14ipfNjDrxxzR5wbyq5pt9ZceOhd2KVzmrk8i0ElH'; // Your USDA API key
-  
+  static const String _apiKey = '14ipfNjDrxxzR5wbyq5pt9ZceOhd2KVzmrk8i0El';
+
   final http.Client _client;
 
   USDAApiClient({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Search for food in USDA database
-  /// Returns null if not found or nutrients incomplete
-  Future<NutritionalData?> searchFood(String query) async {
-    if (query.trim().isEmpty) return null;
+  /// Search for food in USDA database with retry logic.
+  /// Returns up to 20 results that have CKD nutrients.
+  Future<List<NutritionalData>> searchFoods(String query) async {
+    if (query.trim().isEmpty) return [];
 
-    try {
-      logger.info('Searching USDA API', context: {'query': query});
+    for (int attempt = 1; attempt <= 2; attempt++) {
+      try {
+        logger.info('Searching USDA API', context: {'query': query, 'attempt': attempt});
 
-      final url = Uri.parse('$_baseUrl/foods/search').replace(
-        queryParameters: {
-          'api_key': _apiKey,
-          'query': query,
-          'pageSize': '1', // Get best match only
-          'dataType': 'Foundation,SR Legacy,Survey (FNDDS),Branded', // All data types
-        },
-      );
+        final url = Uri.parse('$_baseUrl/foods/search').replace(
+          queryParameters: {
+            'api_key': _apiKey,
+            'query': query,
+            'pageSize': '25', // Fetch 25, filter down to those with nutrients
+            'dataType': 'Foundation,SR Legacy,Survey (FNDDS),Branded',
+          },
+        );
 
-      final response = await _client.get(url).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => http.Response('Timeout', 408),
-      );
+        final response = await _client.get(url).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            logger.warning('USDA API timeout', context: {'attempt': attempt});
+            return http.Response('Timeout', 408);
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        if (data['foods'] != null && (data['foods'] as List).isNotEmpty) {
-          final food = data['foods'][0];
-          final nutritionalData = _parseUSDAFood(food);
-          
-          if (nutritionalData != null && _hasRequiredNutrients(nutritionalData)) {
-            logger.info('Found food in USDA', context: {
-              'name': nutritionalData.productName,
-              'hasAllNutrients': true,
-            });
-            return nutritionalData;
-          } else {
-            logger.warning('USDA food missing required CKD nutrients', context: {
-              'name': food['description'],
-            });
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final foods = data['foods'] as List? ?? [];
+
+          if (foods.isEmpty) {
+            logger.info('No foods found in USDA', context: {'query': query});
+            return [];
+          }
+
+          // Parse all results and keep those with usable CKD nutrients
+          final results = <NutritionalData>[];
+          for (final food in foods) {
+            final nutritionalData = _parseUSDAFood(food);
+            if (nutritionalData != null && _hasRequiredNutrients(nutritionalData)) {
+              results.add(nutritionalData);
+              if (results.length >= 20) break; // Cap at 20 results
+            }
+          }
+
+          logger.info('USDA returned results', context: {'count': results.length, 'query': query});
+          return results;
+
+        } else if (response.statusCode == 408 || response.statusCode == 503 || response.statusCode == 504) {
+          logger.warning('USDA API transient error, will retry', context: {
+            'statusCode': response.statusCode,
+            'attempt': attempt,
+          });
+          if (attempt < 2) {
+            await Future.delayed(const Duration(milliseconds: 800));
+            continue;
           }
         } else {
-          logger.info('No foods found in USDA', context: {'query': query});
+          logger.warning('USDA API error', context: {'statusCode': response.statusCode});
+          return [];
         }
-      } else {
-        logger.warning('USDA API error', context: {
-          'statusCode': response.statusCode,
-          'body': response.body,
-        });
+      } catch (e, stackTrace) {
+        logger.error('Error searching USDA', error: e, stackTrace: stackTrace, context: {'attempt': attempt});
+        if (attempt < 2) {
+          await Future.delayed(const Duration(milliseconds: 800));
+          continue;
+        }
       }
-
-      return null;
-    } catch (e, stackTrace) {
-      logger.error('Error searching USDA', error: e, stackTrace: stackTrace);
-      return null;
     }
+
+    return [];
   }
 
-  /// Parse USDA food item to NutritionalData
+  /// Legacy single-result search (kept for compatibility)
+  Future<NutritionalData?> searchFood(String query) async {
+    final results = await searchFoods(query);
+    return results.isEmpty ? null : results.first;
+  }
+
+  /// Parse a USDA food item into NutritionalData.
   NutritionalData? _parseUSDAFood(Map<String, dynamic> food) {
     try {
       final nutrients = food['foodNutrients'] as List? ?? [];
-      
-      // Extract nutrients by nutrient number
+
       double? sodium;
       double? potassium;
       double? phosphorus;
@@ -86,28 +107,25 @@ class USDAApiClient {
         final nutrientName = nutrient['nutrientName']?.toString().toLowerCase() ?? '';
         final value = (nutrient['value'] as num?)?.toDouble();
 
-        if (value == null) continue;
+        if (value == null || value <= 0) continue;
 
-        // Sodium (nutrient #307)
         if (nutrientNumber == '307' || nutrientName.contains('sodium')) {
           sodium = value;
-        }
-        // Potassium (nutrient #306)
-        else if (nutrientNumber == '306' || nutrientName.contains('potassium')) {
+        } else if (nutrientNumber == '306' || nutrientName.contains('potassium')) {
           potassium = value;
-        }
-        // Phosphorus (nutrient #305)
-        else if (nutrientNumber == '305' || nutrientName.contains('phosphorus')) {
+        } else if (nutrientNumber == '305' || nutrientName.contains('phosphorus')) {
           phosphorus = value;
-        }
-        // Protein (nutrient #203)
-        else if (nutrientNumber == '203' || nutrientName.contains('protein')) {
+        } else if (nutrientNumber == '203' || nutrientName.contains('protein')) {
           protein = value;
         }
       }
 
-      // Must have at least 3 of the 4 required nutrients
-      if ([sodium, potassium, phosphorus, protein].where((n) => n != null).length < 3) {
+      final nutrientCount = [sodium, potassium, phosphorus, protein]
+          .where((n) => n != null && n > 0)
+          .length;
+
+      if (nutrientCount == 0) {
+        logger.warning('USDA food has no nutrients', context: {'name': food['description']});
         return null;
       }
 
@@ -125,10 +143,10 @@ class USDAApiClient {
     }
   }
 
-  /// Check if nutritional data has all required CKD nutrients
   bool _hasRequiredNutrients(NutritionalData data) {
-    // For CKD tracking, we need sodium, potassium, phosphorus
-    // Protein is optional but nice to have
-    return data.sodium > 0 || data.potassium > 0 || data.phosphorus > 0;
+    return data.sodium > 0 ||
+        data.potassium > 0 ||
+        data.phosphorus > 0 ||
+        data.protein > 0;
   }
 }

@@ -296,7 +296,7 @@ class _DietaryProfileScreenState extends ConsumerState<DietaryProfileScreen> {
                                 children: [
                                   
                                   
-                                  Text('Healthy'),
+                                  Text('Health Conscious'),
                                 ],
                               ),
                             ),

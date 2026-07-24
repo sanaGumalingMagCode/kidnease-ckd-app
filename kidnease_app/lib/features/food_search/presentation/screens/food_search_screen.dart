@@ -15,14 +15,19 @@ class FoodSearchScreen extends ConsumerStatefulWidget {
 class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
-  NutritionalData? _searchResult;
-  NutritionalData? _baseNutritionalData; // Store base data for portion calculation
+
+  // Selected food and its base data for portion scaling
+  NutritionalData? _selectedFood;
+  NutritionalData? _baseNutritionalData;
+
+  // List of search results
+  List<NutritionalData> _searchResults = [];
+  String? _dataSource;
   String? _errorMessage;
-  String? _dataSource; // Track where data came from
-  double _selectedPortion = 100.0; // Default portion size in grams
+
+  double _selectedPortion = 100.0;
   final List<double> _portionSizes = [100, 200, 250, 300];
-  
-  // API clients
+
   late final USDAApiClient _usdaClient;
   late final OpenFoodFactsApiClient _openFoodFactsClient;
 
@@ -39,109 +44,108 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
     super.dispose();
   }
 
+  // ─── Search ───────────────────────────────────────────────────────────────
+
   Future<void> _searchFood() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) {
-      setState(() {
-        _errorMessage = 'Please enter a food name';
-      });
+      setState(() => _errorMessage = 'Please enter a food name');
       return;
     }
 
     setState(() {
       _isSearching = true;
       _errorMessage = null;
-      _searchResult = null;
+      _searchResults = [];
+      _selectedFood = null;
       _baseNutritionalData = null;
       _dataSource = null;
       _selectedPortion = 100.0;
     });
 
     try {
-      NutritionalData? result;
+      List<NutritionalData> results = [];
 
-      // CASCADE SEARCH SYSTEM - No data will clash!
-      // Each API is tried in order, first complete result wins
-      
-      // 1. LOCAL FALLBACK (Highest priority - Filipino dishes, fast food)
-      //    Instant results, complete CKD nutrients, culturally relevant
-      result = _searchFallbackDatabase(query);
-      if (result != null) {
+      // 1. Open Food Facts first (2M+ foods)
+      print('🔍 Searching Open Food Facts for: "$query"');
+      final offResults = await _openFoodFactsClient.searchFoods(query);
+      results.addAll(offResults);
+      print('✅ Open Food Facts: ${offResults.length} results');
+
+      // 2. USDA next (400K+ foods) — merge, avoiding exact name duplicates
+      print('🔍 Searching USDA for: "$query"');
+      final usdaResults = await _usdaClient.searchFoods(query);
+      print('✅ USDA: ${usdaResults.length} results');
+
+      for (final item in usdaResults) {
+        final alreadyHave = results.any(
+          (r) => r.productName.toLowerCase() == item.productName.toLowerCase(),
+        );
+        if (!alreadyHave) results.add(item);
+      }
+
+      if (results.isEmpty) {
         setState(() {
           _isSearching = false;
-          _baseNutritionalData = result;
-          _searchResult = result;
-          _dataSource = 'Local Database';
+          _errorMessage = 'No food found for "$query".\n\n'
+              'Tips:\n'
+              '• Use simple terms: "chicken", "rice", "egg"\n'
+              '• Try ingredient names: "broccoli", "salmon"\n'
+              '• Try brand + product: "coca cola", "lucky me"\n'
+              '• Check spelling';
         });
         return;
       }
 
-      // 2. USDA API (Second priority - verified government data)
-      //    400K+ foods, no rate limits, complete CKD nutrients
-      result = await _usdaClient.searchFood(query);
-      if (result != null) {
-        setState(() {
-          _isSearching = false;
-          _baseNutritionalData = result;
-          _searchResult = result;
-          _dataSource = 'USDA FoodData Central';
-        });
-        return;
-      }
+      // Determine primary source label
+      String source = 'USDA FoodData Central';
+      if (offResults.isNotEmpty) source = 'Open Food Facts + USDA';
+      if (offResults.isEmpty) source = 'USDA FoodData Central';
+      if (usdaResults.isEmpty && offResults.isNotEmpty) source = 'Open Food Facts';
 
-      // 3. OPEN FOOD FACTS API (Third priority - global packaged products)
-      //    2M+ foods, no rate limits, good for Philippine products
-      result = await _openFoodFactsClient.searchFood(query);
-      if (result != null) {
-        setState(() {
-          _isSearching = false;
-          _baseNutritionalData = result;
-          _searchResult = result;
-          _dataSource = 'Open Food Facts';
-        });
-        return;
-      }
-
-      // 4. FATSECRET API (Backup - rate limited but good coverage)
-      //    1M+ foods, complete nutrients
-      final fatSecretClient = ref.read(fatSecretApiClientProvider);
-      result = await fatSecretClient.searchProduct(query);
-      if (result != null) {
-        setState(() {
-          _isSearching = false;
-          _baseNutritionalData = result;
-          _searchResult = result;
-          _dataSource = 'FatSecret';
-        });
-        return;
-      }
-
-      // 5. NOT FOUND in any database
       setState(() {
         _isSearching = false;
-        _errorMessage = 'No food found with that name. Try these:\n\n'
-            'Common Foods:\n• Banana  • White Rice  • Brown Rice\n• Chicken  • Milk  • Wheat Bread\n\n'
-            'Filipino Dishes:\n• Adobo  • Sinigang  • Kare Kare\n• Leche Flan  • Tinola  • Lumpia\n\n'
-            'Fast Food:\n• Chickenjoy  • Yumburger  • Big Mac\n• KFC Chicken  • Mang Inasal  • Pizza';
+        _searchResults = results;
+        _dataSource = source;
       });
-    } catch (e) {
+    } catch (e, st) {
+      print('⚠️ Error: $e\n$st');
       setState(() {
         _isSearching = false;
-        _errorMessage = 'Error searching food: ${e.toString()}';
+        _errorMessage = 'Error searching: ${e.toString()}\n\nCheck your internet connection.';
       });
     }
   }
 
-  void _updatePortionSize(double newPortion) {
-    if (_baseNutritionalData == null) return;
+  void _selectFood(NutritionalData food) {
+    setState(() {
+      _baseNutritionalData = _normalize100g(food);
+      _selectedPortion = 100.0;
+      _selectedFood = _baseNutritionalData;
+    });
+  }
 
+  /// Strip source suffix and keep only per-100g values
+  NutritionalData _normalize100g(NutritionalData food) => NutritionalData(
+        productName: food.productName
+            .replaceAll(' [USDA]', '')
+            .replaceAll(' [Open Food Facts]', '')
+            .replaceAll(' [OpenFoodFacts]', ''),
+        servingSize: '100g',
+        sodium: food.sodium,
+        potassium: food.potassium,
+        phosphorus: food.phosphorus,
+        protein: food.protein,
+      );
+
+  void _updatePortion(double newPortion) {
+    if (_baseNutritionalData == null) return;
     final base = _baseNutritionalData!;
     final ratio = newPortion / 100.0;
-
     setState(() {
       _selectedPortion = newPortion;
-      _searchResult = NutritionalData(
-        productName: '${base.productName}',
+      _selectedFood = NutritionalData(
+        productName: base.productName,
         servingSize: '${newPortion.toInt()}g',
         sodium: base.sodium * ratio,
         potassium: base.potassium * ratio,
@@ -151,898 +155,7 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
     });
   }
 
-  // Fallback database for common foods (CKD-relevant nutritional data)
-  NutritionalData? _searchFallbackDatabase(String query) {
-    final foods = {
-      // Common foods
-      'banana': NutritionalData(
-        productName: 'Banana (medium, 118g)',
-        servingSize: '1 medium banana (118g)',
-        sodium: 1.2,
-        potassium: 422.0,
-        phosphorus: 26.0,
-        protein: 1.3,
-      ),
-      'white rice': NutritionalData(
-        productName: 'White Rice (cooked)',
-        servingSize: '100g',
-        sodium: 1.3,
-        potassium: 35.0,
-        phosphorus: 27.0,
-        protein: 2.7,
-      ),
-      'chicken': NutritionalData(
-        productName: 'Chicken Breast (cooked)',
-        servingSize: '100g',
-        sodium: 74.0,
-        potassium: 256.0,
-        phosphorus: 228.0,
-        protein: 31.0,
-      ),
-      'chicken breast': NutritionalData(
-        productName: 'Chicken Breast (cooked)',
-        servingSize: '100g',
-        sodium: 74.0,
-        potassium: 256.0,
-        phosphorus: 228.0,
-        protein: 31.0,
-      ),
-      'milk': NutritionalData(
-        productName: 'Whole Milk',
-        servingSize: '1 cup (244g)',
-        sodium: 105.0,
-        potassium: 322.0,
-        phosphorus: 205.0,
-        protein: 7.9,
-      ),
-      'egg': NutritionalData(
-        productName: 'Egg (large)',
-        servingSize: '1 large egg (50g)',
-        sodium: 71.0,
-        potassium: 69.0,
-        phosphorus: 99.0,
-        protein: 6.3,
-      ),
-      'bread': NutritionalData(
-        productName: 'White Bread',
-        servingSize: '100g',
-        sodium: 588.0,
-        potassium: 104.0,
-        phosphorus: 96.0,
-        protein: 9.2,
-      ),
-      'white bread': NutritionalData(
-        productName: 'White Bread',
-        servingSize: '100g',
-        sodium: 588.0,
-        potassium: 104.0,
-        phosphorus: 96.0,
-        protein: 9.2,
-      ),
-      'wheat bread': NutritionalData(
-        productName: 'Whole Wheat Bread',
-        servingSize: '100g',
-        sodium: 400.0,
-        potassium: 220.0,
-        phosphorus: 180.0,
-        protein: 12.0,
-      ),
-      'whole wheat bread': NutritionalData(
-        productName: 'Whole Wheat Bread',
-        servingSize: '100g',
-        sodium: 400.0,
-        potassium: 220.0,
-        phosphorus: 180.0,
-        protein: 12.0,
-      ),
-      'brown bread': NutritionalData(
-        productName: 'Brown Bread',
-        servingSize: '100g',
-        sodium: 480.0,
-        potassium: 200.0,
-        phosphorus: 170.0,
-        protein: 11.0,
-      ),
-      'multigrain bread': NutritionalData(
-        productName: 'Multigrain Bread',
-        servingSize: '100g',
-        sodium: 420.0,
-        potassium: 240.0,
-        phosphorus: 190.0,
-        protein: 13.0,
-      ),
-      'rye bread': NutritionalData(
-        productName: 'Rye Bread',
-        servingSize: '100g',
-        sodium: 660.0,
-        potassium: 180.0,
-        phosphorus: 125.0,
-        protein: 8.5,
-      ),
-      'sourdough bread': NutritionalData(
-        productName: 'Sourdough Bread',
-        servingSize: '100g',
-        sodium: 580.0,
-        potassium: 115.0,
-        phosphorus: 92.0,
-        protein: 9.0,
-      ),
-      'pandesal': NutritionalData(
-        productName: 'Pandesal (Filipino Bread Roll)',
-        servingSize: '100g',
-        sodium: 520.0,
-        potassium: 95.0,
-        phosphorus: 88.0,
-        protein: 8.5,
-      ),
-      'rice': NutritionalData(
-        productName: 'White Rice (cooked)',
-        servingSize: '100g',
-        sodium: 1.3,
-        potassium: 35.0,
-        phosphorus: 27.0,
-        protein: 2.7,
-      ),
-      'white rice': NutritionalData(
-        productName: 'White Rice (cooked)',
-        servingSize: '100g',
-        sodium: 1.3,
-        potassium: 35.0,
-        phosphorus: 27.0,
-        protein: 2.7,
-      ),
-      'brown rice': NutritionalData(
-        productName: 'Brown Rice (cooked)',
-        servingSize: '100g',
-        sodium: 5.0,
-        potassium: 86.0, // Higher potassium
-        phosphorus: 83.0, // Much higher phosphorus
-        protein: 2.6,
-      ),
-      'jasmine rice': NutritionalData(
-        productName: 'Jasmine Rice (cooked)',
-        servingSize: '100g',
-        sodium: 1.0,
-        potassium: 38.0,
-        phosphorus: 30.0,
-        protein: 2.8,
-      ),
-      'basmati rice': NutritionalData(
-        productName: 'Basmati Rice (cooked)',
-        servingSize: '100g',
-        sodium: 2.0,
-        potassium: 40.0,
-        phosphorus: 32.0,
-        protein: 3.0,
-      ),
-      'red rice': NutritionalData(
-        productName: 'Red Rice (cooked)',
-        servingSize: '100g',
-        sodium: 4.0,
-        potassium: 95.0, // High potassium
-        phosphorus: 90.0, // High phosphorus
-        protein: 3.5,
-      ),
-      'black rice': NutritionalData(
-        productName: 'Black Rice (cooked)',
-        servingSize: '100g',
-        sodium: 3.0,
-        potassium: 100.0, // High potassium
-        phosphorus: 95.0, // High phosphorus
-        protein: 4.0,
-      ),
-      'fried rice': NutritionalData(
-        productName: 'Fried Rice',
-        servingSize: '100g',
-        sodium: 380.0, // Much higher from soy sauce
-        potassium: 80.0,
-        phosphorus: 60.0,
-        protein: 4.5,
-      ),
-      'glutinous rice': NutritionalData(
-        productName: 'Glutinous Rice / Sticky Rice (cooked)',
-        servingSize: '100g',
-        sodium: 2.0,
-        potassium: 25.0,
-        phosphorus: 18.0,
-        protein: 2.2,
-      ),
-      'apple': NutritionalData(
-        productName: 'Apple (medium)',
-        servingSize: '1 medium apple (182g)',
-        sodium: 1.8,
-        potassium: 195.0,
-        phosphorus: 20.0,
-        protein: 0.5,
-      ),
-      'orange': NutritionalData(
-        productName: 'Orange (medium)',
-        servingSize: '1 medium orange (131g)',
-        sodium: 0.0,
-        potassium: 237.0,
-        phosphorus: 18.0,
-        protein: 1.2,
-      ),
-      'potato': NutritionalData(
-        productName: 'Potato (boiled)',
-        servingSize: '1 medium (173g)',
-        sodium: 10.0,
-        potassium: 544.0,
-        phosphorus: 84.0,
-        protein: 3.1,
-      ),
-      'fish': NutritionalData(
-        productName: 'White Fish (cooked)',
-        servingSize: '100g',
-        sodium: 54.0,
-        potassium: 390.0,
-        phosphorus: 250.0,
-        protein: 22.0,
-      ),
-      'pork': NutritionalData(
-        productName: 'Pork (lean, cooked)',
-        servingSize: '100g',
-        sodium: 62.0,
-        potassium: 423.0,
-        phosphorus: 246.0,
-        protein: 27.0,
-      ),
-      'beef': NutritionalData(
-        productName: 'Beef (lean, cooked)',
-        servingSize: '100g',
-        sodium: 72.0,
-        potassium: 370.0,
-        phosphorus: 230.0,
-        protein: 26.0,
-      ),
-      
-      // Filipino Dishes
-      'adobo': NutritionalData(
-        productName: 'Chicken Adobo (Filipino)',
-        servingSize: '1 cup (240g)',
-        sodium: 800.0, // High sodium from soy sauce
-        potassium: 350.0,
-        phosphorus: 200.0,
-        protein: 25.0,
-      ),
-      'chicken adobo': NutritionalData(
-        productName: 'Chicken Adobo (Filipino)',
-        servingSize: '1 cup (240g)',
-        sodium: 800.0,
-        potassium: 350.0,
-        phosphorus: 200.0,
-        protein: 25.0,
-      ),
-      'sinigang': NutritionalData(
-        productName: 'Sinigang (Filipino Soup)',
-        servingSize: '1 bowl (300g)',
-        sodium: 650.0,
-        potassium: 450.0,
-        phosphorus: 150.0,
-        protein: 18.0,
-      ),
-      'kare kare': NutritionalData(
-        productName: 'Kare-Kare (Filipino Peanut Stew)',
-        servingSize: '1 cup (250g)',
-        sodium: 520.0,
-        potassium: 480.0, // High from peanuts and vegetables
-        phosphorus: 200.0, // High from peanuts
-        protein: 20.0,
-      ),
-      'kare-kare': NutritionalData(
-        productName: 'Kare-Kare (Filipino Peanut Stew)',
-        servingSize: '1 cup (250g)',
-        sodium: 520.0,
-        potassium: 480.0,
-        phosphorus: 200.0,
-        protein: 20.0,
-      ),
-      'leche flan': NutritionalData(
-        productName: 'Leche Flan (Filipino Custard)',
-        servingSize: '1 slice (80g)',
-        sodium: 85.0,
-        potassium: 150.0,
-        phosphorus: 140.0, // High from eggs and milk
-        protein: 6.5,
-      ),
-      'lechon': NutritionalData(
-        productName: 'Lechon (Roasted Pig)',
-        servingSize: '100g',
-        sodium: 750.0, // High sodium
-        potassium: 320.0,
-        phosphorus: 280.0, // High from meat
-        protein: 28.0,
-      ),
-      'lumpia': NutritionalData(
-        productName: 'Lumpia (Filipino Spring Roll)',
-        servingSize: '2 pieces (100g)',
-        sodium: 450.0,
-        potassium: 180.0,
-        phosphorus: 120.0,
-        protein: 8.0,
-      ),
-      'pancit': NutritionalData(
-        productName: 'Pancit (Filipino Noodles)',
-        servingSize: '1 cup (200g)',
-        sodium: 680.0, // High from soy sauce
-        potassium: 220.0,
-        phosphorus: 140.0,
-        protein: 12.0,
-      ),
-      'tinola': NutritionalData(
-        productName: 'Tinola (Chicken Ginger Soup)',
-        servingSize: '1 bowl (300g)',
-        sodium: 580.0,
-        potassium: 380.0,
-        phosphorus: 180.0,
-        protein: 22.0,
-      ),
-      'sisig': NutritionalData(
-        productName: 'Sisig (Filipino Sizzling Pork)',
-        servingSize: '1 cup (200g)',
-        sodium: 920.0, // Very high sodium
-        potassium: 350.0,
-        phosphorus: 240.0,
-        protein: 24.0,
-      ),
-      'halo halo': NutritionalData(
-        productName: 'Halo-Halo (Filipino Dessert)',
-        servingSize: '1 serving (300g)',
-        sodium: 120.0,
-        potassium: 380.0, // High from fruits and beans
-        phosphorus: 160.0,
-        protein: 6.0,
-      ),
-      'halo-halo': NutritionalData(
-        productName: 'Halo-Halo (Filipino Dessert)',
-        servingSize: '1 serving (300g)',
-        sodium: 120.0,
-        potassium: 380.0,
-        phosphorus: 160.0,
-        protein: 6.0,
-      ),
-      'bistek': NutritionalData(
-        productName: 'Bistek Tagalog (Filipino Beef Steak)',
-        servingSize: '1 serving (200g)',
-        sodium: 720.0, // High from soy sauce
-        potassium: 420.0,
-        phosphorus: 260.0,
-        protein: 26.0,
-      ),
-      'menudo': NutritionalData(
-        productName: 'Menudo (Filipino Pork Stew)',
-        servingSize: '1 cup (240g)',
-        sodium: 650.0,
-        potassium: 450.0, // High from tomatoes and potatoes
-        phosphorus: 220.0,
-        protein: 22.0,
-      ),
-      'caldereta': NutritionalData(
-        productName: 'Caldereta (Filipino Beef Stew)',
-        servingSize: '1 cup (240g)',
-        sodium: 780.0,
-        potassium: 520.0, // High from tomatoes and potatoes
-        phosphorus: 240.0,
-        protein: 24.0,
-      ),
-      'paksiw': NutritionalData(
-        productName: 'Paksiw na Isda (Fish in Vinegar)',
-        servingSize: '1 serving (150g)',
-        sodium: 480.0,
-        potassium: 410.0,
-        phosphorus: 270.0, // High from fish
-        protein: 23.0,
-      ),
-      'nilaga': NutritionalData(
-        productName: 'Nilaga (Filipino Beef Soup)',
-        servingSize: '1 bowl (300g)',
-        sodium: 620.0,
-        potassium: 480.0, // High from vegetables
-        phosphorus: 200.0,
-        protein: 20.0,
-      ),
-      'dinuguan': NutritionalData(
-        productName: 'Dinuguan (Pork Blood Stew)',
-        servingSize: '1 cup (240g)',
-        sodium: 850.0, // High sodium
-        potassium: 320.0,
-        phosphorus: 280.0, // Very high from blood and pork
-        protein: 18.0,
-      ),
-      'arroz caldo': NutritionalData(
-        productName: 'Arroz Caldo (Filipino Rice Porridge)',
-        servingSize: '1 bowl (300g)',
-        sodium: 720.0,
-        potassium: 280.0,
-        phosphorus: 160.0,
-        protein: 16.0,
-      ),
-      'bulalo': NutritionalData(
-        productName: 'Bulalo (Beef Marrow Soup)',
-        servingSize: '1 bowl (350g)',
-        sodium: 680.0,
-        potassium: 500.0,
-        phosphorus: 320.0, // Very high from bone marrow
-        protein: 22.0,
-      ),
-      'tocino': NutritionalData(
-        productName: 'Tocino (Sweet Cured Pork)',
-        servingSize: '100g',
-        sodium: 920.0, // Very high sodium from curing
-        potassium: 320.0,
-        phosphorus: 240.0,
-        protein: 26.0,
-      ),
-      'longganisa': NutritionalData(
-        productName: 'Longganisa (Filipino Sausage)',
-        servingSize: '2 links (100g)',
-        sodium: 880.0, // Very high sodium
-        potassium: 280.0,
-        phosphorus: 220.0,
-        protein: 24.0,
-      ),
-      'turon': NutritionalData(
-        productName: 'Turon (Banana Spring Roll)',
-        servingSize: '1 piece (80g)',
-        sodium: 120.0,
-        potassium: 280.0, // High from banana
-        phosphorus: 45.0,
-        protein: 2.5,
-      ),
-      'bibingka': NutritionalData(
-        productName: 'Bibingka (Rice Cake)',
-        servingSize: '1 piece (100g)',
-        sodium: 180.0,
-        potassium: 140.0,
-        phosphorus: 160.0, // High from eggs and coconut milk
-        protein: 5.5,
-      ),
-      'puto': NutritionalData(
-        productName: 'Puto (Steamed Rice Cake)',
-        servingSize: '2 pieces (60g)',
-        sodium: 95.0,
-        potassium: 80.0,
-        phosphorus: 85.0,
-        protein: 3.2,
-      ),
-      'cassava cake': NutritionalData(
-        productName: 'Cassava Cake',
-        servingSize: '1 slice (100g)',
-        sodium: 110.0,
-        potassium: 220.0,
-        phosphorus: 125.0,
-        protein: 4.0,
-      ),
-      'ube halaya': NutritionalData(
-        productName: 'Ube Halaya (Purple Yam Jam)',
-        servingSize: '100g',
-        sodium: 65.0,
-        potassium: 380.0, // High from ube
-        phosphorus: 95.0,
-        protein: 2.8,
-      ),
-      
-      // Fast Food - Jollibee
-      'chickenjoy': NutritionalData(
-        productName: 'Jollibee Chickenjoy (1 piece)',
-        servingSize: '100g',
-        sodium: 890.0, // Very high sodium
-        potassium: 280.0,
-        phosphorus: 250.0,
-        protein: 24.0,
-      ),
-      'jollibee chickenjoy': NutritionalData(
-        productName: 'Jollibee Chickenjoy (1 piece)',
-        servingSize: '100g',
-        sodium: 890.0,
-        potassium: 280.0,
-        phosphorus: 250.0,
-        protein: 24.0,
-      ),
-      'jolly spaghetti': NutritionalData(
-        productName: 'Jollibee Jolly Spaghetti',
-        servingSize: '100g',
-        sodium: 650.0, // High sodium
-        potassium: 220.0,
-        phosphorus: 120.0,
-        protein: 8.5,
-      ),
-      'jollibee spaghetti': NutritionalData(
-        productName: 'Jollibee Jolly Spaghetti',
-        servingSize: '100g',
-        sodium: 650.0,
-        potassium: 220.0,
-        phosphorus: 120.0,
-        protein: 8.5,
-      ),
-      'yumburger': NutritionalData(
-        productName: 'Jollibee Yumburger',
-        servingSize: '100g',
-        sodium: 720.0, // High sodium
-        potassium: 180.0,
-        phosphorus: 160.0,
-        protein: 14.0,
-      ),
-      'jollibee burger': NutritionalData(
-        productName: 'Jollibee Yumburger',
-        servingSize: '100g',
-        sodium: 720.0,
-        potassium: 180.0,
-        phosphorus: 160.0,
-        protein: 14.0,
-      ),
-      'jolly hotdog': NutritionalData(
-        productName: 'Jollibee Jolly Hotdog',
-        servingSize: '100g',
-        sodium: 920.0, // Very high sodium
-        potassium: 160.0,
-        phosphorus: 145.0,
-        protein: 12.0,
-      ),
-      'palabok': NutritionalData(
-        productName: 'Jollibee Palabok Fiesta',
-        servingSize: '100g',
-        sodium: 780.0, // High sodium
-        potassium: 200.0,
-        phosphorus: 180.0,
-        protein: 10.5,
-      ),
-      'jollibee palabok': NutritionalData(
-        productName: 'Jollibee Palabok Fiesta',
-        servingSize: '100g',
-        sodium: 780.0,
-        potassium: 200.0,
-        phosphorus: 180.0,
-        protein: 10.5,
-      ),
-      'peach mango pie': NutritionalData(
-        productName: 'Jollibee Peach Mango Pie',
-        servingSize: '100g',
-        sodium: 240.0,
-        potassium: 150.0,
-        phosphorus: 65.0,
-        protein: 3.2,
-      ),
-      'jollibee pie': NutritionalData(
-        productName: 'Jollibee Peach Mango Pie',
-        servingSize: '100g',
-        sodium: 240.0,
-        potassium: 150.0,
-        phosphorus: 65.0,
-        protein: 3.2,
-      ),
-      
-      // Fast Food - McDonald's
-      'big mac': NutritionalData(
-        productName: 'McDonald\'s Big Mac',
-        servingSize: '100g',
-        sodium: 460.0, // High sodium
-        potassium: 140.0,
-        phosphorus: 130.0,
-        protein: 12.5,
-      ),
-      'mcdonalds burger': NutritionalData(
-        productName: 'McDonald\'s Big Mac',
-        servingSize: '100g',
-        sodium: 460.0,
-        potassium: 140.0,
-        phosphorus: 130.0,
-        protein: 12.5,
-      ),
-      'chicken mcdo': NutritionalData(
-        productName: 'McDonald\'s Fried Chicken',
-        servingSize: '100g',
-        sodium: 820.0, // High sodium
-        potassium: 260.0,
-        phosphorus: 240.0,
-        protein: 23.0,
-      ),
-      'mcnuggets': NutritionalData(
-        productName: 'McDonald\'s Chicken McNuggets',
-        servingSize: '100g',
-        sodium: 680.0,
-        potassium: 180.0,
-        phosphorus: 200.0,
-        protein: 16.5,
-      ),
-      'chicken nuggets': NutritionalData(
-        productName: 'McDonald\'s Chicken McNuggets',
-        servingSize: '100g',
-        sodium: 680.0,
-        potassium: 180.0,
-        phosphorus: 200.0,
-        protein: 16.5,
-      ),
-      'french fries': NutritionalData(
-        productName: 'French Fries (Fast Food)',
-        servingSize: '100g',
-        sodium: 210.0,
-        potassium: 450.0, // High potassium!
-        phosphorus: 120.0,
-        protein: 3.4,
-      ),
-      'fries': NutritionalData(
-        productName: 'French Fries (Fast Food)',
-        servingSize: '100g',
-        sodium: 210.0,
-        potassium: 450.0, // High potassium!
-        phosphorus: 120.0,
-        protein: 3.4,
-      ),
-      'mcflurry': NutritionalData(
-        productName: 'McDonald\'s McFlurry',
-        servingSize: '100g',
-        sodium: 95.0,
-        potassium: 180.0,
-        phosphorus: 140.0, // High from milk
-        protein: 5.5,
-      ),
-      
-      // Fast Food - KFC
-      'kfc chicken': NutritionalData(
-        productName: 'KFC Fried Chicken',
-        servingSize: '100g',
-        sodium: 850.0, // Very high sodium
-        potassium: 270.0,
-        phosphorus: 260.0,
-        protein: 25.0,
-      ),
-      'kfc': NutritionalData(
-        productName: 'KFC Fried Chicken',
-        servingSize: '100g',
-        sodium: 850.0,
-        potassium: 270.0,
-        phosphorus: 260.0,
-        protein: 25.0,
-      ),
-      'zinger': NutritionalData(
-        productName: 'KFC Zinger Burger',
-        servingSize: '100g',
-        sodium: 740.0,
-        potassium: 190.0,
-        phosphorus: 170.0,
-        protein: 13.5,
-      ),
-      'kfc zinger': NutritionalData(
-        productName: 'KFC Zinger Burger',
-        servingSize: '100g',
-        sodium: 740.0,
-        potassium: 190.0,
-        phosphorus: 170.0,
-        protein: 13.5,
-      ),
-      'mashed potato': NutritionalData(
-        productName: 'KFC Mashed Potato with Gravy',
-        servingSize: '100g',
-        sodium: 420.0, // High sodium from gravy
-        potassium: 320.0, // High from potato
-        phosphorus: 65.0,
-        protein: 2.8,
-      ),
-      'coleslaw': NutritionalData(
-        productName: 'KFC Coleslaw',
-        servingSize: '100g',
-        sodium: 240.0,
-        potassium: 180.0,
-        phosphorus: 45.0,
-        protein: 1.5,
-      ),
-      
-      // Fast Food - Chowking
-      'chowking': NutritionalData(
-        productName: 'Chowking Pork Chao Fan',
-        servingSize: '100g',
-        sodium: 680.0, // High sodium
-        potassium: 190.0,
-        phosphorus: 140.0,
-        protein: 9.5,
-      ),
-      'chao fan': NutritionalData(
-        productName: 'Chowking Pork Chao Fan',
-        servingSize: '100g',
-        sodium: 680.0,
-        potassium: 190.0,
-        phosphorus: 140.0,
-        protein: 9.5,
-      ),
-      'wonton soup': NutritionalData(
-        productName: 'Chowking Wonton Soup',
-        servingSize: '100g',
-        sodium: 720.0, // Very high sodium
-        potassium: 150.0,
-        phosphorus: 95.0,
-        protein: 7.5,
-      ),
-      'siomai': NutritionalData(
-        productName: 'Chowking Pork Siomai',
-        servingSize: '100g',
-        sodium: 620.0,
-        potassium: 170.0,
-        phosphorus: 160.0,
-        protein: 12.0,
-      ),
-      'chowking siomai': NutritionalData(
-        productName: 'Chowking Pork Siomai',
-        servingSize: '100g',
-        sodium: 620.0,
-        potassium: 170.0,
-        phosphorus: 160.0,
-        protein: 12.0,
-      ),
-      'lauriat': NutritionalData(
-        productName: 'Chowking Lauriat (Mixed Meal)',
-        servingSize: '100g',
-        sodium: 580.0,
-        potassium: 210.0,
-        phosphorus: 130.0,
-        protein: 11.0,
-      ),
-      
-      // Fast Food - Mang Inasal
-      'mang inasal': NutritionalData(
-        productName: 'Mang Inasal Chicken Inasal',
-        servingSize: '100g',
-        sodium: 750.0, // High sodium
-        potassium: 310.0,
-        phosphorus: 230.0,
-        protein: 26.0,
-      ),
-      'chicken inasal': NutritionalData(
-        productName: 'Mang Inasal Chicken Inasal',
-        servingSize: '100g',
-        sodium: 750.0,
-        potassium: 310.0,
-        phosphorus: 230.0,
-        protein: 26.0,
-      ),
-      'inasal': NutritionalData(
-        productName: 'Mang Inasal Chicken Inasal',
-        servingSize: '100g',
-        sodium: 750.0,
-        potassium: 310.0,
-        phosphorus: 230.0,
-        protein: 26.0,
-      ),
-      'pork bbq': NutritionalData(
-        productName: 'Mang Inasal Pork BBQ',
-        servingSize: '100g',
-        sodium: 820.0, // Very high sodium
-        potassium: 350.0,
-        phosphorus: 240.0,
-        protein: 24.0,
-      ),
-      
-      // Fast Food - Greenwich
-      'greenwich': NutritionalData(
-        productName: 'Greenwich Lasagna Supreme',
-        servingSize: '100g',
-        sodium: 590.0,
-        potassium: 210.0,
-        phosphorus: 180.0, // High from cheese
-        protein: 11.5,
-      ),
-      'lasagna': NutritionalData(
-        productName: 'Greenwich Lasagna Supreme',
-        servingSize: '100g',
-        sodium: 590.0,
-        potassium: 210.0,
-        phosphorus: 180.0,
-        protein: 11.5,
-      ),
-      'pizza': NutritionalData(
-        productName: 'Pizza (Cheese)',
-        servingSize: '100g',
-        sodium: 640.0, // High sodium
-        potassium: 170.0,
-        phosphorus: 200.0, // High from cheese
-        protein: 12.0,
-      ),
-      'greenwich pizza': NutritionalData(
-        productName: 'Greenwich Pizza (Cheese)',
-        servingSize: '100g',
-        sodium: 640.0,
-        potassium: 170.0,
-        phosphorus: 200.0,
-        protein: 12.0,
-      ),
-      
-      // Additional Common Fast Foods
-      'burger': NutritionalData(
-        productName: 'Burger (Generic Fast Food)',
-        servingSize: '100g',
-        sodium: 520.0,
-        potassium: 160.0,
-        phosphorus: 140.0,
-        protein: 13.0,
-      ),
-      'cheeseburger': NutritionalData(
-        productName: 'Cheeseburger (Fast Food)',
-        servingSize: '100g',
-        sodium: 680.0, // Higher sodium with cheese
-        potassium: 170.0,
-        phosphorus: 180.0, // Higher with cheese
-        protein: 14.5,
-      ),
-      'hotdog': NutritionalData(
-        productName: 'Hotdog (Fast Food)',
-        servingSize: '100g',
-        sodium: 810.0, // Very high sodium
-        potassium: 150.0,
-        phosphorus: 130.0,
-        protein: 11.5,
-      ),
-      'hot dog': NutritionalData(
-        productName: 'Hotdog (Fast Food)',
-        servingSize: '100g',
-        sodium: 810.0,
-        potassium: 150.0,
-        phosphorus: 130.0,
-        protein: 11.5,
-      ),
-      'onion rings': NutritionalData(
-        productName: 'Onion Rings (Fast Food)',
-        servingSize: '100g',
-        sodium: 380.0,
-        potassium: 160.0,
-        phosphorus: 90.0,
-        protein: 4.2,
-      ),
-      'sundae': NutritionalData(
-        productName: 'Ice Cream Sundae (Fast Food)',
-        servingSize: '100g',
-        sodium: 75.0,
-        potassium: 160.0,
-        phosphorus: 110.0, // High from milk
-        protein: 4.5,
-      ),
-      'soft drink': NutritionalData(
-        productName: 'Soft Drink / Soda',
-        servingSize: '100g',
-        sodium: 8.0,
-        potassium: 2.0,
-        phosphorus: 12.0, // Contains phosphoric acid
-        protein: 0.0,
-      ),
-      'soda': NutritionalData(
-        productName: 'Soft Drink / Soda',
-        servingSize: '100g',
-        sodium: 8.0,
-        potassium: 2.0,
-        phosphorus: 12.0,
-        protein: 0.0,
-      ),
-      'coke': NutritionalData(
-        productName: 'Coca-Cola / Soft Drink',
-        servingSize: '100g',
-        sodium: 8.0,
-        potassium: 2.0,
-        phosphorus: 12.0, // Contains phosphoric acid
-        protein: 0.0,
-      ),
-      'iced tea': NutritionalData(
-        productName: 'Iced Tea (Sweetened)',
-        servingSize: '100g',
-        sodium: 6.0,
-        potassium: 15.0,
-        phosphorus: 3.0,
-        protein: 0.1,
-      ),
-    };
-
-    final lowerQuery = query.toLowerCase();
-
-    // Exact match first
-    if (foods.containsKey(lowerQuery)) return foods[lowerQuery];
-
-    // Partial match - find first food whose key contains the query or vice versa
-    for (final entry in foods.entries) {
-      if (entry.key.contains(lowerQuery) || lowerQuery.contains(entry.key)) {
-        return entry.value;
-      }
-    }
-
-    return null;
-  }
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -1051,82 +164,55 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       appBar: AppBar(
         title: const Text(
           'Food Search',
-          style: TextStyle(
-            color: Color(0xFF2C3E50),
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Color(0xFF2C3E50), fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF4A90E2)),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Info card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4A90E2).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF4A90E2).withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: const Color(0xFF4A90E2),
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Search for Filipino dishes, common foods, and packaged products to see their nutritional information',
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          Expanded(
+            child: _selectedFood != null
+                ? _buildFoodDetail()
+                : _searchResults.isNotEmpty
+                    ? _buildResultsList()
+                    : _buildEmptyState(),
+          ),
+        ],
+      ),
+    );
+  }
 
-              // Search bar
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
+  // ─── Search bar ───────────────────────────────────────────────────────────
+
+  Widget _buildSearchBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
                 child: TextField(
                   controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _searchFood(),
                   decoration: InputDecoration(
-                    hintText: 'Try: "kare kare", "leche flan", "banana"',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: Color(0xFF4A90E2),
-                    ),
+                    hintText: 'Search foods, e.g. "chicken", "rice"…',
+                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF4A90E2)),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, color: Colors.grey),
                             onPressed: () {
                               _searchController.clear();
                               setState(() {
-                                _searchResult = null;
+                                _searchResults = [];
+                                _selectedFood = null;
                                 _errorMessage = null;
                               });
                             },
@@ -1134,401 +220,322 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
                         : null,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4A90E2), width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
+                    fillColor: Colors.grey[50],
                   ),
-                  onChanged: (value) {
-                    setState(() {}); // Rebuild to show/hide clear button
-                  },
-                  onSubmitted: (_) => _searchFood(),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Search button
-              ElevatedButton(
-                onPressed: _isSearching ? null : _searchFood,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90E2),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isSearching ? null : _searchFood,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
                   ),
-                  elevation: 2,
+                  child: _isSearching
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Search', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-                child: _isSearching
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Search',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
               ),
-              const SizedBox(height: 24),
-
-              // Error message
-              if (_errorMessage != null)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.red.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Search result
-              if (_searchResult != null) _buildResultCard(_searchResult!),
-              
-              // Data source indicator
-              if (_dataSource != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _getDataSourceColor().withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _getDataSourceColor().withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _getDataSourceIcon(),
-                          size: 16,
-                          color: _getDataSourceColor(),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Source: $_dataSource',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _getDataSourceColor(),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
             ],
           ),
-        ),
+          if (_dataSource != null && _searchResults.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.cloud_done_outlined, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 4),
+                Text(
+                  '${_searchResults.length} results from $_dataSource',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Color _getDataSourceColor() {
-    switch (_dataSource) {
-      case 'Local Database':
-        return const Color(0xFF4CAF50); // Green
-      case 'USDA FoodData Central':
-        return const Color(0xFF2196F3); // Blue
-      case 'Open Food Facts':
-        return const Color(0xFFFF9800); // Orange
-      case 'FatSecret':
-        return const Color(0xFF9C27B0); // Purple
-      default:
-        return Colors.grey;
-    }
-  }
+  // ─── Results list ─────────────────────────────────────────────────────────
 
-  IconData _getDataSourceIcon() {
-    switch (_dataSource) {
-      case 'Local Database':
-        return Icons.home;
-      case 'USDA FoodData Central':
-        return Icons.verified;
-      case 'Open Food Facts':
-        return Icons.public;
-      case 'FatSecret':
-        return Icons.cloud;
-      default:
-        return Icons.info;
-    }
-  }
+  Widget _buildResultsList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: _searchResults.length,
+      itemBuilder: (context, i) {
+        final food = _searchResults[i];
+        final isOFF = food.productName.contains('[Open Food Facts]') ||
+            food.productName.contains('[OpenFoodFacts]');
+        final sourceColor = isOFF ? const Color(0xFFE67E22) : const Color(0xFF27AE60);
+        final sourceLabel = isOFF ? 'Open Food Facts' : 'USDA';
+        final displayName = food.productName
+            .replaceAll(' [USDA]', '')
+            .replaceAll(' [Open Food Facts]', '')
+            .replaceAll(' [OpenFoodFacts]', '');
 
-  Widget _buildResultCard(NutritionalData data) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey[200]!),
           ),
-        ],
+          child: InkWell(
+            onTap: () => _selectFood(food),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A90E2).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.restaurant, color: Color(0xFF4A90E2), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Color(0xFF2C3E50),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            _miniNutrient('Na', food.sodium, Colors.blue),
+                            const SizedBox(width: 6),
+                            _miniNutrient('K', food.potassium, Colors.orange),
+                            const SizedBox(width: 6),
+                            _miniNutrient('P', food.phosphorus, Colors.purple),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: sourceColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          sourceLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: sourceColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _miniNutrient(String label, double value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
       ),
+      child: Text(
+        '$label: ${value.toStringAsFixed(0)}mg',
+        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+
+  // ─── Food detail ──────────────────────────────────────────────────────────
+
+  Widget _buildFoodDetail() {
+    final food = _selectedFood!;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.restaurant,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            data.productName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Serving: ${data.servingSize}',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          // Back to results button
+          TextButton.icon(
+            onPressed: () => setState(() => _selectedFood = null),
+            icon: const Icon(Icons.arrow_back, size: 18),
+            label: const Text('Back to results'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF4A90E2),
+              alignment: Alignment.centerLeft,
+              padding: EdgeInsets.zero,
             ),
           ),
+          const SizedBox(height: 8),
 
-          // Portion Size Selector
+          // Food name header
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF4A90E2).withValues(alpha: 0.05),
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.grey.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
+              color: const Color(0xFF4A90E2),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.scale,
-                      size: 20,
-                      color: Color(0xFF4A90E2),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Portion Size:',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2C3E50),
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4A90E2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: DropdownButton<double>(
-                        value: _selectedPortion,
-                        underline: const SizedBox(),
-                        dropdownColor: Colors.white,
-                        icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                const Icon(Icons.restaurant_menu, color: Colors.white, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        food.productName,
                         style: const TextStyle(
                           color: Colors.white,
+                          fontWeight: FontWeight.bold,
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
                         ),
-                        items: _portionSizes.map((size) {
-                          return DropdownMenuItem<double>(
-                            value: size,
-                            child: Text(
-                              '${size.toInt()}g',
-                              style: const TextStyle(
-                                color: Color(0xFF2C3E50),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (newValue) {
-                          if (newValue != null) {
-                            _updatePortionSize(newValue);
-                          }
-                        },
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Select portion size to adjust nutritional values',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                      Text(
+                        'Serving: ${food.servingSize}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
 
-          // Nutritional information
-          Padding(
-            padding: const EdgeInsets.all(20),
+          // Portion selector
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.scale, color: Color(0xFF4A90E2), size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Portion Size',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                    ),
+                    const Spacer(),
+                    DropdownButton<double>(
+                      value: _selectedPortion,
+                      underline: const SizedBox(),
+                      style: const TextStyle(
+                        color: Color(0xFF4A90E2),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      items: _portionSizes
+                          .map((p) => DropdownMenuItem(
+                                value: p,
+                                child: Text('${p.toInt()}g'),
+                              ))
+                          .toList(),
+                      onChanged: (v) { if (v != null) _updatePortion(v); },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Values below are calculated for ${_selectedPortion.toInt()}g',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Nutrient card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'CKD-Important Nutrients',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2C3E50)),
                 ),
-                const SizedBox(height: 16),
-
-                // Sodium
-                _buildNutrientRow(
-                  icon: Icons.water_drop,
-                  color: Colors.blue,
-                  label: 'Sodium',
-                  value: '${data.sodium.toStringAsFixed(0)} mg',
-                ),
-                const Divider(height: 24),
-
-                // Potassium
-                _buildNutrientRow(
-                  icon: Icons.local_fire_department,
-                  color: Colors.orange,
-                  label: 'Potassium',
-                  value: '${data.potassium.toStringAsFixed(0)} mg',
-                ),
-                const Divider(height: 24),
-
-                // Phosphorus
-                _buildNutrientRow(
-                  icon: Icons.diamond,
-                  color: Colors.purple,
-                  label: 'Phosphorus',
-                  value: '${data.phosphorus.toStringAsFixed(0)} mg',
-                ),
-                const Divider(height: 24),
-
-                // Protein
-                _buildNutrientRow(
-                  icon: Icons.fitness_center,
-                  color: Colors.green,
-                  label: 'Protein',
-                  value: '${data.protein.toStringAsFixed(1)} g',
+                const SizedBox(height: 12),
+                _nutrientRow(Icons.water_drop, 'Sodium', food.sodium, 'mg', Colors.blue),
+                const Divider(height: 20),
+                _nutrientRow(Icons.local_fire_department, 'Potassium', food.potassium, 'mg', Colors.orange),
+                const Divider(height: 20),
+                _nutrientRow(Icons.diamond, 'Phosphorus', food.phosphorus, 'mg', Colors.purple),
+                const Divider(height: 20),
+                _nutrientRow(Icons.fitness_center, 'Protein', food.protein, 'g', Colors.green),
+                const SizedBox(height: 8),
+                Text(
+                  '* Values per ${_selectedPortion.toInt()}g serving',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[400]),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
 
-          // Disclaimer
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Compare these values with your daily limits',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ),
-              ],
+          // Use this food button
+          ElevatedButton.icon(
+            onPressed: () => _confirmAddFood(food),
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Use This Food', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF27AE60),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
             ),
           ),
         ],
@@ -1536,12 +543,7 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
     );
   }
 
-  Widget _buildNutrientRow({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required String value,
-  }) {
+  Widget _nutrientRow(IconData icon, String label, double value, String unit, Color color) {
     return Row(
       children: [
         Container(
@@ -1550,32 +552,117 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 20,
-          ),
+          child: Icon(icon, color: color, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2C3E50),
-            ),
-          ),
+          child: Text(label,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF2C3E50))),
         ),
         Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4A90E2),
-          ),
+          '${value.toStringAsFixed(1)} $unit',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF4A90E2)),
         ),
       ],
+    );
+  }
+
+  // ─── Empty / error state ──────────────────────────────────────────────────
+
+  Widget _buildEmptyState() {
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off, size: 60, color: Colors.grey[300]),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600], fontSize: 14, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search, size: 70, color: Colors.grey[200]),
+            const SizedBox(height: 16),
+            Text(
+              'Search for any food',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try: "chicken", "rice", "banana",\n"fried chicken", "coca cola"',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey[400]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Confirm add ─────────────────────────────────────────────────────────
+
+  void _confirmAddFood(NutritionalData food) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              food.productName,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Portion: ${food.servingSize}  •  Na: ${food.sodium.toStringAsFixed(0)}mg  •  K: ${food.potassium.toStringAsFixed(0)}mg  •  P: ${food.phosphorus.toStringAsFixed(0)}mg',
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pop(context, food);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF27AE60),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Add to Assessment', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -47,11 +47,15 @@ class GeminiApiClientImpl implements GeminiApiClient {
 
     int retryCount = 0;
     const maxRetries = ApiEndpoints.maxRetries;
+    // Try primary model first, fall back to openrouter/free on 400
+    final modelsToTry = [ApiEndpoints.openRouterModel, ApiEndpoints.openRouterModelFallback];
+    int modelIndex = 0;
 
     while (retryCount <= maxRetries) {
+      final currentModel = modelsToTry[modelIndex.clamp(0, modelsToTry.length - 1)];
       try {
         logger.info('Analyzing food with OpenRouter API', context: {
-          'model': ApiEndpoints.openRouterModel,
+          'model': currentModel,
           'attempt': retryCount + 1,
         });
 
@@ -68,7 +72,7 @@ class GeminiApiClientImpl implements GeminiApiClient {
 
         // OpenRouter uses OpenAI-compatible chat format
         final requestBody = {
-          'model': ApiEndpoints.openRouterModel,
+          'model': currentModel,
           'messages': [
             {
               'role': 'user',
@@ -118,6 +122,20 @@ class GeminiApiClientImpl implements GeminiApiClient {
 
         if (response.statusCode == 401 || response.statusCode == 403) {
           throw const ApiException('Invalid OpenRouter API key. Please check your OPENROUTER_API_KEY in .env');
+        }
+
+        // 400 means the model rejected the request - try fallback model
+        if (response.statusCode == 400) {
+          logger.warning('Model returned 400, switching to fallback model', context: {
+            'failedModel': currentModel,
+          });
+          if (modelIndex < modelsToTry.length - 1) {
+            modelIndex++;
+            continue;
+          }
+          final errorBody = jsonDecode(response.body);
+          final errorMsg = errorBody['error']?['message'] ?? 'Provider error';
+          throw ApiException('Food analysis error: $errorMsg. Please try a different image.');
         }
 
         if (response.statusCode >= 500) {
