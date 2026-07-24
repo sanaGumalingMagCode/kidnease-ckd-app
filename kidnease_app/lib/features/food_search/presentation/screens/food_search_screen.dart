@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../food_assessment/data/models/nutritional_data.dart';
 import '../../../../shared/providers/providers.dart';
+import '../../data/datasources/usda_api_client.dart';
+import '../../data/datasources/openfoodfacts_api_client.dart';
 
 class FoodSearchScreen extends ConsumerStatefulWidget {
   const FoodSearchScreen({super.key});
@@ -16,8 +18,20 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
   NutritionalData? _searchResult;
   NutritionalData? _baseNutritionalData; // Store base data for portion calculation
   String? _errorMessage;
+  String? _dataSource; // Track where data came from
   double _selectedPortion = 100.0; // Default portion size in grams
   final List<double> _portionSizes = [100, 200, 250, 300];
+  
+  // API clients
+  late final USDAApiClient _usdaClient;
+  late final OpenFoodFactsApiClient _openFoodFactsClient;
+
+  @override
+  void initState() {
+    super.initState();
+    _usdaClient = USDAApiClient();
+    _openFoodFactsClient = OpenFoodFactsApiClient();
+  }
 
   @override
   void dispose() {
@@ -39,30 +53,76 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       _errorMessage = null;
       _searchResult = null;
       _baseNutritionalData = null;
+      _dataSource = null;
       _selectedPortion = 100.0;
     });
 
     try {
-      // Try FatSecret API first
-      final fatSecretClient = ref.read(fatSecretApiClientProvider);
-      var result = await fatSecretClient.searchProduct(query);
+      NutritionalData? result;
 
-      // If FatSecret returns null, use fallback database
-      if (result == null) {
-        result = _searchFallbackDatabase(query);
+      // CASCADE SEARCH SYSTEM - No data will clash!
+      // Each API is tried in order, first complete result wins
+      
+      // 1. LOCAL FALLBACK (Highest priority - Filipino dishes, fast food)
+      //    Instant results, complete CKD nutrients, culturally relevant
+      result = _searchFallbackDatabase(query);
+      if (result != null) {
+        setState(() {
+          _isSearching = false;
+          _baseNutritionalData = result;
+          _searchResult = result;
+          _dataSource = 'Local Database';
+        });
+        return;
       }
 
+      // 2. USDA API (Second priority - verified government data)
+      //    400K+ foods, no rate limits, complete CKD nutrients
+      result = await _usdaClient.searchFood(query);
+      if (result != null) {
+        setState(() {
+          _isSearching = false;
+          _baseNutritionalData = result;
+          _searchResult = result;
+          _dataSource = 'USDA FoodData Central';
+        });
+        return;
+      }
+
+      // 3. OPEN FOOD FACTS API (Third priority - global packaged products)
+      //    2M+ foods, no rate limits, good for Philippine products
+      result = await _openFoodFactsClient.searchFood(query);
+      if (result != null) {
+        setState(() {
+          _isSearching = false;
+          _baseNutritionalData = result;
+          _searchResult = result;
+          _dataSource = 'Open Food Facts';
+        });
+        return;
+      }
+
+      // 4. FATSECRET API (Backup - rate limited but good coverage)
+      //    1M+ foods, complete nutrients
+      final fatSecretClient = ref.read(fatSecretApiClientProvider);
+      result = await fatSecretClient.searchProduct(query);
+      if (result != null) {
+        setState(() {
+          _isSearching = false;
+          _baseNutritionalData = result;
+          _searchResult = result;
+          _dataSource = 'FatSecret';
+        });
+        return;
+      }
+
+      // 5. NOT FOUND in any database
       setState(() {
         _isSearching = false;
-        if (result != null) {
-          _baseNutritionalData = result; // Store base data
-          _searchResult = result;
-        } else {
-          _errorMessage = 'No food found with that name. Try these:\n\n'
-              'Common Foods:\n• Banana  • White Rice  • Brown Rice\n• Chicken  • Milk  • Wheat Bread\n\n'
-              'Filipino Dishes:\n• Adobo  • Sinigang  • Kare Kare\n• Leche Flan  • Tinola  • Lumpia\n\n'
-              'Fast Food:\n• Chickenjoy  • Yumburger  • Big Mac\n• KFC Chicken  • Mang Inasal  • Pizza';
-        }
+        _errorMessage = 'No food found with that name. Try these:\n\n'
+            'Common Foods:\n• Banana  • White Rice  • Brown Rice\n• Chicken  • Milk  • Wheat Bread\n\n'
+            'Filipino Dishes:\n• Adobo  • Sinigang  • Kare Kare\n• Leche Flan  • Tinola  • Lumpia\n\n'
+            'Fast Food:\n• Chickenjoy  • Yumburger  • Big Mac\n• KFC Chicken  • Mang Inasal  • Pizza';
       });
     } catch (e) {
       setState(() {
@@ -1156,11 +1216,76 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
 
               // Search result
               if (_searchResult != null) _buildResultCard(_searchResult!),
+              
+              // Data source indicator
+              if (_dataSource != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _getDataSourceColor().withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _getDataSourceColor().withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getDataSourceIcon(),
+                          size: 16,
+                          color: _getDataSourceColor(),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Source: $_dataSource',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _getDataSourceColor(),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Color _getDataSourceColor() {
+    switch (_dataSource) {
+      case 'Local Database':
+        return const Color(0xFF4CAF50); // Green
+      case 'USDA FoodData Central':
+        return const Color(0xFF2196F3); // Blue
+      case 'Open Food Facts':
+        return const Color(0xFFFF9800); // Orange
+      case 'FatSecret':
+        return const Color(0xFF9C27B0); // Purple
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getDataSourceIcon() {
+    switch (_dataSource) {
+      case 'Local Database':
+        return Icons.home;
+      case 'USDA FoodData Central':
+        return Icons.verified;
+      case 'Open Food Facts':
+        return Icons.public;
+      case 'FatSecret':
+        return Icons.cloud;
+      default:
+        return Icons.info;
+    }
   }
 
   Widget _buildResultCard(NutritionalData data) {
